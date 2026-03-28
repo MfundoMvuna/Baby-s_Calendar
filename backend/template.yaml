@@ -1,0 +1,413 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Baby's Calendar - Pregnancy Tracker API
+  Serverless backend with C# Lambda functions, DynamoDB, S3, Cognito, SNS.
+  Deployed to af-south-1 (South Africa) for POPIA data residency compliance.
+
+Globals:
+  Function:
+    Runtime: dotnet8
+    MemorySize: 512
+    Timeout: 30
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref PregnancyTable
+        EVENTS_TABLE_NAME: !Ref EventsTable
+        SYMPTOMS_TABLE_NAME: !Ref SymptomsTable
+        PHOTOS_BUCKET: !Ref PhotosBucket
+        SNS_TOPIC_ARN: !Ref NotificationsTopic
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+  CognitoDomain:
+    Type: String
+    Default: babys-calendar
+
+Resources:
+  # ──────────────────────────────────────────────
+  # Cognito User Pool (Authentication + MFA)
+  # ──────────────────────────────────────────────
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub babys-calendar-${Environment}
+      AutoVerifiedAttributes:
+        - email
+      MfaConfiguration: OPTIONAL
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 10
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: false
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: babys-calendar-web
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+
+  # ──────────────────────────────────────────────
+  # DynamoDB Tables (encrypted at rest by default)
+  # ──────────────────────────────────────────────
+  PregnancyTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub babys-calendar-pregnancy-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+
+  EventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub babys-calendar-events-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: eventId
+          AttributeType: S
+        - AttributeName: date
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: eventId
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: DateIndex
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: date
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  SymptomsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub babys-calendar-symptoms-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: date
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: date
+          KeyType: RANGE
+
+  # ──────────────────────────────────────────────
+  # S3 Bucket for photos (encrypted, versioned)
+  # ──────────────────────────────────────────────
+  PhotosBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub babys-calendar-photos-${Environment}-${AWS::AccountId}
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ["*"]
+            AllowedMethods: [GET, PUT]
+            AllowedOrigins: ["*"]
+            MaxAge: 3600
+
+  # ──────────────────────────────────────────────
+  # SNS Topic for push notifications / reminders
+  # ──────────────────────────────────────────────
+  NotificationsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub babys-calendar-notifications-${Environment}
+      KmsMasterKeyId: alias/aws/sns
+
+  # ──────────────────────────────────────────────
+  # API Gateway (REST)
+  # ──────────────────────────────────────────────
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub babys-calendar-api-${Environment}
+      StageName: !Ref Environment
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt UserPool.Arn
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowOrigin: "'*'"
+
+  # ──────────────────────────────────────────────
+  # Lambda Functions (C# / .NET 8)
+  # ──────────────────────────────────────────────
+
+  # Pregnancy Record CRUD
+  GetPregnancyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.PregnancyFunctions::GetRecord
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref PregnancyTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /pregnancy
+            Method: GET
+
+  CreatePregnancyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.PregnancyFunctions::CreateRecord
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PregnancyTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /pregnancy
+            Method: POST
+
+  # Calendar Events CRUD
+  GetEventsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.EventsFunctions::GetEvents
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref EventsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /events
+            Method: GET
+
+  CreateEventFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.EventsFunctions::CreateEvent
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /events
+            Method: POST
+
+  UpdateEventFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.EventsFunctions::UpdateEvent
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /events/{eventId}
+            Method: PUT
+
+  # Symptom / Journal entries
+  GetSymptomsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.SymptomsFunctions::GetEntries
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref SymptomsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /symptoms
+            Method: GET
+
+  CreateSymptomFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.SymptomsFunctions::CreateEntry
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SymptomsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /symptoms
+            Method: POST
+
+  # Photo presigned URL generation
+  GetUploadUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.PhotosFunctions::GetUploadUrl
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref PhotosBucket
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /photos/upload-url
+            Method: POST
+
+  # Scheduled reminder sender (runs daily at 8 AM SAST / 6 AM UTC)
+  ReminderSchedulerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.ReminderFunctions::SendReminders
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref EventsTable
+        - SNSPublishMessagePolicy:
+            TopicArn: !Ref NotificationsTopic
+      Events:
+        DailySchedule:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 6 * * ? *)
+            Description: Send daily appointment reminders
+
+  # ──────────────────────────────────────────────
+  # CloudTrail for auditing (compliance)
+  # ──────────────────────────────────────────────
+  AuditLogBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub babys-calendar-audit-${Environment}-${AWS::AccountId}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  AuditLogBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AuditLogBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudTrailWrite
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub ${AuditLogBucket.Arn}/*
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+          - Sid: AllowCloudTrailCheck
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource: !GetAtt AuditLogBucket.Arn
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/
+
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref UserPool
+
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value: !Ref UserPoolClient
+
+  PhotosBucketName:
+    Description: S3 bucket for photo uploads
+    Value: !Ref PhotosBucket
+
+  NotificationsTopicArn:
+    Description: SNS topic for reminders
+    Value: !Ref NotificationsTopic

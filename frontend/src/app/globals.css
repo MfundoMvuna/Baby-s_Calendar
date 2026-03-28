@@ -1,0 +1,145 @@
+@import "tailwindcss";
+
+@theme {
+  /* Pink/Purple Pregnancy Palette */
+  --color-primary-50: #fdf2f8;
+  --color-primary-100: #fce7f3;
+  --color-primary-200: #fbcfe8;
+  --color-primary-300: #f9a8d4;
+  --color-primary-400: #f472b6;
+  --color-primary-500: #ec4899;
+  --color-primary-600: #db2777;
+  --color-primary-700: #be185d;
+
+  --color-purple-50: #faf5ff;
+  --color-purple-100: #f3e8ff;
+  --color-purple-200: #e9d5ff;
+  --color-purple-300: #d8b4fe;
+  --color-purple-400: #c084fc;
+  --color-purple-500: #a855f7;
+  --color-purple-600: #9333ea;
+
+  --color-sage-50: #f0fdf4;
+  --color-sage-100: #dcfce7;
+  --color-sage-200: #bbf7d0;
+  --color-sage-300: #86efac;
+
+  --color-beige-50: #fefce8;
+  --color-beige-100: #fef9c3;
+  --color-beige-200: #fef08a;
+
+  --font-sans: 'Lato', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Global base styles */
+body {
+  font-family: var(--font-sans);
+  background: linear-gradient(135deg, var(--color-primary-50) 0%, var(--color-purple-50) 50%, var(--color-sage-50) 100%);
+  min-height: 100vh;
+}
+
+/* Trimester color coding */
+.trimester-1 { background-color: var(--color-purple-100); border-color: var(--color-purple-300); }
+.trimester-2 { background-color: var(--color-primary-100); border-color: var(--color-primary-300); }
+.trimester-3 { background-color: var(--color-sage-100); border-color: var(--color-sage-300); }
+
+/* Calendar event dots */
+.event-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.event-dot-appointment { background-color: var(--color-primary-500); }
+.event-dot-milestone { background-color: var(--color-purple-500); }
+.event-dot-test { background-color: #f59e0b; }
+.event-dot-photo { background-color: var(--color-sage-300); }
+
+/* Soft card styling */
+.card {
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  border: 1px solid rgba(236, 72, 153, 0.08);
+}
+
+/* Button styles */
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-primary-500), var(--color-purple-500));
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  border: none;
+  cursor: pointer;
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--color-primary-600), var(--color-purple-600));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
+}
+
+.btn-secondary {
+  background: white;
+  color: var(--color-primary-600);
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  border: 2px solid var(--color-primary-200);
+  cursor: pointer;
+}
+.btn-secondary:hover {
+  background: var(--color-primary-50);
+  border-color: var(--color-primary-400);
+}
+
+/* Progress bar */
+.progress-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--color-primary-100);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--color-purple-400), var(--color-primary-400), var(--color-sage-300));
+  transition: width 0.5s ease;
+}
+
+/* Input styles */
+input[type="text"],
+input[type="date"],
+input[type="number"],
+input[type="email"],
+textarea,
+select {
+  border: 2px solid var(--color-primary-100);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  width: 100%;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+  background: white;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--color-primary-400);
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.1);
+}
+
+/* Checkbox styling */
+input[type="checkbox"] {
+  accent-color: var(--color-primary-500);
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--color-primary-50); }
+::-webkit-scrollbar-thumb { background: var(--color-primary-200); border-radius: 3px; }

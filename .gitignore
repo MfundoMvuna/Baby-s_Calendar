@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Next.js
+frontend/.next/
+frontend/out/
+
+# Build outputs
+backend/.aws-sam/
+backend/src/**/bin/
+backend/src/**/obj/
+
+# Environment
+.env*.local
+!.env.local.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
