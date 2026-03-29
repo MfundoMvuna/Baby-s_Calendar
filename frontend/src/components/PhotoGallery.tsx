@@ -97,7 +97,6 @@ export default function PhotoGallery({ photos, onUpload }: Props) {
             ref={fileRef}
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={handleFileChange}
             className="hidden"
           />

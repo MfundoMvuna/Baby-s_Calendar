@@ -16,12 +16,13 @@ import {
   isToday,
 } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import type { CalendarEvent } from "@/lib/types";
+import type { CalendarEvent, PhotoRecord } from "@/lib/types";
 import { getTrimester, TRIMESTERS } from "@/lib/clinical-timeline";
 import { getCurrentWeek } from "@/lib/utils";
 
 interface Props {
   events: CalendarEvent[];
+  photos?: PhotoRecord[];
   lmpDate: string;
   onSelectDate: (date: Date) => void;
   selectedDate: Date | null;
@@ -42,6 +43,7 @@ const EVENT_DOT_COLORS: Record<string, string> = {
 
 export default function PregnancyCalendar({
   events,
+  photos = [],
   lmpDate,
   onSelectDate,
   selectedDate,
@@ -62,6 +64,12 @@ export default function PregnancyCalendar({
   function eventsForDay(day: Date): CalendarEvent[] {
     const dayStr = format(day, "yyyy-MM-dd");
     return events.filter((e) => e.date === dayStr);
+  }
+
+  /** Check if a day has photos */
+  function hasPhotosForDay(day: Date): boolean {
+    const dayStr = format(day, "yyyy-MM-dd");
+    return photos.some((p) => p.date === dayStr);
   }
 
   /** Trimester-accent border color for the header */
@@ -119,6 +127,7 @@ export default function PregnancyCalendar({
           const today = isToday(day);
           const dayEvents = eventsForDay(day);
           const hasEvents = dayEvents.length > 0;
+          const hasPhotos = hasPhotosForDay(day);
 
           return (
             <button
@@ -138,14 +147,17 @@ export default function PregnancyCalendar({
               </span>
 
               {/* Event dots */}
-              {hasEvents && (
-                <div className="flex gap-0.5 mt-0.5">
+              {(hasEvents || hasPhotos) && (
+                <div className="flex gap-0.5 mt-0.5 items-center">
                   {dayEvents.slice(0, 3).map((evt) => (
                     <span
                       key={evt.eventId}
                       className={`w-1.5 h-1.5 rounded-full ${selected ? "bg-white/80" : EVENT_DOT_COLORS[evt.type] ?? "bg-gray-300"}`}
                     />
                   ))}
+                  {hasPhotos && (
+                    <span className={`w-1.5 h-1.5 rounded-full ${selected ? "bg-white/80" : "bg-green-400"}`} />
+                  )}
                 </div>
               )}
             </button>
@@ -159,6 +171,7 @@ export default function PregnancyCalendar({
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500" /> Scan</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> Test</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-pink-400" /> Milestone</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400" /> Photo</span>
       </div>
     </div>
   );

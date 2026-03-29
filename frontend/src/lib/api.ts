@@ -8,6 +8,7 @@ import type {
   OnboardingData,
   PhotoRecord,
   PregnancyRecord,
+  SubscriptionStatus,
   SymptomEntry,
 } from "./types";
 import { calculateEDD, generateId, getCurrentWeek } from "./utils";
@@ -172,6 +173,49 @@ export const remoteApi = {
     return apiFetch("/photos/upload-url", {
       method: "POST",
       body: JSON.stringify({ filename }),
+    });
+  },
+
+  /** Upload a file directly to S3 via presigned URL, then save metadata */
+  async uploadPhoto(
+    file: File,
+    weekNumber: number,
+    type: PhotoRecord["type"],
+    caption: string,
+    date: string,
+  ): Promise<PhotoRecord> {
+    // 1. Get presigned PUT URL
+    const { uploadUrl, s3Key } = await this.getUploadUrl(file.name);
+
+    // 2. Upload directly to S3
+    await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type || "image/*" },
+      body: file,
+    });
+
+    // 3. Save metadata to backend
+    return apiFetch<PhotoRecord>("/photos", {
+      method: "POST",
+      body: JSON.stringify({ s3Key, weekNumber, type, caption, date }),
+    });
+  },
+
+  /** Get all photos with presigned GET URLs */
+  async getPhotos(): Promise<PhotoRecord[]> {
+    return apiFetch<PhotoRecord[]>("/photos");
+  },
+
+  // ── Subscription ─────────────────────────────
+
+  async getSubscription(): Promise<SubscriptionStatus> {
+    return apiFetch<SubscriptionStatus>("/subscription");
+  },
+
+  async processPayment(yocoToken: string): Promise<{ message: string; plan: string; expiresAt: string }> {
+    return apiFetch("/subscription/pay", {
+      method: "POST",
+      body: JSON.stringify({ token: yocoToken }),
     });
   },
 };

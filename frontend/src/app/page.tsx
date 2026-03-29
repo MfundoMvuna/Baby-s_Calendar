@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { format, addDays, parseISO } from "date-fns";
-import { Plus, Baby, Heart, Menu, X, LogOut } from "lucide-react";
+import { Plus, Baby, Heart, Menu, X, LogOut, Crown, Camera } from "lucide-react";
+import Script from "next/script";
 
 import { useAuth } from "@/components/AuthProvider";
 import AuthScreen from "@/components/AuthScreen";
@@ -12,8 +13,9 @@ import TrimesterProgress from "@/components/TrimesterProgress";
 import EventDetailPanel from "@/components/EventDetailPanel";
 import PhotoGallery from "@/components/PhotoGallery";
 import DailyCheckIn from "@/components/DailyCheckIn";
+import Paywall from "@/components/Paywall";
 
-import type { CalendarEvent, OnboardingData, PhotoRecord, PregnancyRecord, SymptomEntry } from "@/lib/types";
+import type { CalendarEvent, OnboardingData, PhotoRecord, PregnancyRecord, SubscriptionStatus, SymptomEntry } from "@/lib/types";
 import { DEFAULT_MILESTONES } from "@/lib/clinical-timeline";
 import {
   getPregnancyRecord,
@@ -25,6 +27,7 @@ import {
   savePhotoRecord,
   getSymptomEntries,
   saveSymptomEntry,
+  remoteApi,
 } from "@/lib/api";
 import { calculateEDD, dateForWeek, formatDate, generateId, getCurrentWeek } from "@/lib/utils";
 
@@ -41,17 +44,29 @@ export default function HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
+  // Subscription state
+  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
+  const [showPaywall, setShowPaywall] = useState(false);
+
   // New event form state
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newType, setNewType] = useState<CalendarEvent["type"]>("appointment");
 
-  // Load data from localStorage on mount
+  // Load data from localStorage on mount + fetch remote data
   useEffect(() => {
     setRecord(getPregnancyRecord());
     setEvents(getEvents());
     setPhotos(getPhotos());
     setMounted(true);
+
+    // Fetch subscription status and remote photos when backend is available
+    if (remoteApi.available) {
+      remoteApi.getSubscription().then(setSubscription).catch(() => {});
+      remoteApi.getPhotos().then((remote) => {
+        if (remote.length > 0) setPhotos(remote);
+      }).catch(() => {});
+    }
   }, []);
 
   /** Seed default milestone events once on first setup */
@@ -123,6 +138,13 @@ export default function HomePage() {
   /** Add a new custom event */
   function handleAddEvent() {
     if (!selectedDate || !newTitle.trim()) return;
+
+    // Check free-tier custom event limit
+    if (subscription && !subscription.limits.isPremium && subscription.customEventCount >= subscription.limits.maxCustomEvents) {
+      setShowPaywall(true);
+      return;
+    }
+
     saveEvent({
       date: format(selectedDate, "yyyy-MM-dd"),
       title: newTitle,
@@ -136,18 +158,41 @@ export default function HomePage() {
     setShowAddEvent(false);
   }
 
-  /** Photo upload handler (stores data URL in localStorage for offline demo) */
-  function handlePhotoUpload(
+  /** Photo upload handler — uses S3 presigned URLs when backend is available */
+  async function handlePhotoUpload(
     file: File,
     weekNumber: number,
     type: PhotoRecord["type"],
     caption: string
   ) {
+    // Check free-tier limit
+    if (subscription && !subscription.limits.isPremium && photos.length >= subscription.limits.maxPhotos) {
+      setShowPaywall(true);
+      return;
+    }
+
+    const today = format(new Date(), "yyyy-MM-dd");
+
+    if (remoteApi.available) {
+      try {
+        const saved = await remoteApi.uploadPhoto(file, weekNumber, type, caption, today);
+        // Refresh photos from remote
+        const updated = await remoteApi.getPhotos();
+        setPhotos(updated);
+        // Refresh subscription counts
+        remoteApi.getSubscription().then(setSubscription).catch(() => {});
+        return;
+      } catch (err) {
+        console.error("Remote upload failed, falling back to local:", err);
+      }
+    }
+
+    // Fallback: localStorage with data URL
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
       savePhotoRecord({
-        date: format(new Date(), "yyyy-MM-dd"),
+        date: today,
         s3Key: `local/${file.name}`,
         caption,
         weekNumber,
@@ -198,8 +243,32 @@ export default function HomePage() {
 
   const currentWeek = getCurrentWeek(record.lmpDate);
 
+  /** Photos for a selected calendar date */
+  const selectedDatePhotos = selectedDate
+    ? photos.filter((p) => p.date === format(selectedDate, "yyyy-MM-dd"))
+    : [];
+
+  /** Subscription refresh after payment */
+  function handleSubscriptionUpgraded() {
+    setShowPaywall(false);
+    if (remoteApi.available) {
+      remoteApi.getSubscription().then(setSubscription).catch(() => {});
+    }
+  }
+
   return (
     <div className="min-h-screen">
+      {/* Yoco SDK */}
+      <Script src="https://js.yoco.com/sdk/v1/yoco-sdk-web.js" strategy="lazyOnload" />
+
+      {/* Paywall overlay */}
+      {showPaywall && subscription && (
+        <Paywall
+          subscription={subscription}
+          onUpgraded={handleSubscriptionUpgraded}
+          onClose={() => setShowPaywall(false)}
+        />
+      )}
       {/* ── Top bar ── */}
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-primary-100 px-4 py-3">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
@@ -213,6 +282,19 @@ export default function HomePage() {
             <span className="hidden sm:block text-sm text-purple-500 font-medium">
               Week {currentWeek}
             </span>
+            {subscription && !subscription.limits.isPremium && (
+              <button
+                onClick={() => setShowPaywall(true)}
+                className="hidden sm:flex items-center gap-1 text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1.5 rounded-full hover:shadow-md transition"
+              >
+                <Crown className="w-3 h-3" /> Upgrade
+              </button>
+            )}
+            {subscription?.limits.isPremium && (
+              <span className="hidden sm:flex items-center gap-1 text-xs text-purple-500 font-medium">
+                <Crown className="w-3 h-3" /> Premium
+              </span>
+            )}
             <button
               onClick={handleSignOut}
               title="Sign out"
@@ -273,6 +355,7 @@ export default function HomePage() {
               <div className="md:col-span-3">
                 <PregnancyCalendar
                   events={events}
+                  photos={photos}
                   lmpDate={record.lmpDate}
                   onSelectDate={setSelectedDate}
                   selectedDate={selectedDate}
@@ -290,6 +373,35 @@ export default function HomePage() {
                       onSaveNote={handleSaveNote}
                       onSaveAnswer={handleSaveAnswer}
                     />
+
+                    {/* Photos for this date */}
+                    {selectedDatePhotos.length > 0 && (
+                      <div className="card p-4">
+                        <h4 className="text-sm font-semibold text-primary-700 flex items-center gap-2 mb-2">
+                          <Camera className="w-4 h-4" /> Photos for {format(selectedDate, "d MMM")}
+                        </h4>
+                        <div className="grid grid-cols-3 gap-2">
+                          {selectedDatePhotos.map((photo) => (
+                            <div key={photo.photoId} className="relative">
+                              {photo.presignedUrl ? (
+                                <img
+                                  src={photo.presignedUrl}
+                                  alt={photo.caption ?? `Week ${photo.weekNumber}`}
+                                  className="rounded-lg w-full aspect-square object-cover"
+                                />
+                              ) : (
+                                <div className="rounded-lg w-full aspect-square bg-primary-50 flex items-center justify-center">
+                                  <Camera className="w-5 h-5 text-primary-200" />
+                                </div>
+                              )}
+                              {photo.caption && (
+                                <p className="text-[9px] text-gray-500 mt-1 truncate">{photo.caption}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Add event button */}
                     {!showAddEvent ? (

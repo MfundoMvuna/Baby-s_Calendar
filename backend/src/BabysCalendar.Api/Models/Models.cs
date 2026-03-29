@@ -130,3 +130,100 @@ public class UploadUrlResponse
     [JsonPropertyName("s3Key")]
     public string S3Key { get; set; } = string.Empty;
 }
+
+// ── Photo Metadata ─────────────────────────────
+
+public class PhotoMetadata
+{
+    [JsonPropertyName("userId")]
+    public string UserId { get; set; } = string.Empty;
+
+    [JsonPropertyName("photoId")]
+    public string PhotoId { get; set; } = string.Empty;
+
+    [JsonPropertyName("s3Key")]
+    public string S3Key { get; set; } = string.Empty;
+
+    [JsonPropertyName("date")]
+    public string Date { get; set; } = string.Empty;
+
+    [JsonPropertyName("weekNumber")]
+    public int WeekNumber { get; set; }
+
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "bump";
+
+    [JsonPropertyName("caption")]
+    public string? Caption { get; set; }
+
+    [JsonPropertyName("createdAt")]
+    public string CreatedAt { get; set; } = string.Empty;
+}
+
+// ── Subscription / Payment ─────────────────────
+
+public class SubscriptionRecord
+{
+    [JsonPropertyName("userId")]
+    public string UserId { get; set; } = string.Empty;
+
+    [JsonPropertyName("plan")]
+    public string Plan { get; set; } = "free";
+
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = "active";
+
+    [JsonPropertyName("expiresAt")]
+    public string? ExpiresAt { get; set; }
+
+    [JsonPropertyName("yocoChargeId")]
+    public string? YocoChargeId { get; set; }
+
+    [JsonPropertyName("amountCents")]
+    public int AmountCents { get; set; }
+
+    [JsonPropertyName("createdAt")]
+    public string CreatedAt { get; set; } = string.Empty;
+
+    [JsonPropertyName("updatedAt")]
+    public string UpdatedAt { get; set; } = string.Empty;
+}
+
+public class YocoChargeRequest
+{
+    [JsonPropertyName("token")]
+    public string Token { get; set; } = string.Empty;
+}
+
+public class SubscriptionStatusResponse
+{
+    [JsonPropertyName("plan")]
+    public string Plan { get; set; } = "free";
+
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = "active";
+
+    [JsonPropertyName("expiresAt")]
+    public string? ExpiresAt { get; set; }
+
+    [JsonPropertyName("photoCount")]
+    public int PhotoCount { get; set; }
+
+    [JsonPropertyName("customEventCount")]
+    public int CustomEventCount { get; set; }
+
+    [JsonPropertyName("limits")]
+    public SubscriptionLimits Limits { get; set; } = new();
+}
+
+public class SubscriptionLimits
+{
+    [JsonPropertyName("maxPhotos")]
+    public int MaxPhotos { get; set; } = 5;
+
+    [JsonPropertyName("maxCustomEvents")]
+    public int MaxCustomEvents { get; set; } = 3;
+
+    [JsonPropertyName("isPremium")]
+    public bool IsPremium { get; set; }
+}

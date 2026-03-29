@@ -77,3 +77,20 @@ export interface OnboardingData {
   babyNickname?: string;
   extraNotes?: string;
 }
+
+// ── Subscription / Payment ─────────────────────
+
+export interface SubscriptionStatus {
+  plan: "free" | "premium";
+  status: "active" | "expired";
+  expiresAt?: string;
+  photoCount: number;
+  customEventCount: number;
+  limits: SubscriptionLimits;
+}
+
+export interface SubscriptionLimits {
+  maxPhotos: number;
+  maxCustomEvents: number;
+  isPremium: boolean;
+}

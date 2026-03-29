@@ -18,7 +18,10 @@ Globals:
         EVENTS_TABLE_NAME: !Ref EventsTable
         SYMPTOMS_TABLE_NAME: !Ref SymptomsTable
         PHOTOS_BUCKET: !Ref PhotosBucket
+        PHOTOS_TABLE_NAME: !Ref PhotosTable
+        SUBSCRIPTIONS_TABLE_NAME: !Ref SubscriptionsTable
         SNS_TOPIC_ARN: !Ref NotificationsTopic
+        YOCO_SECRET_KEY: !Sub "{{resolve:ssm:/babys-calendar/${Environment}/yoco-secret-key:1}}"
 
 Parameters:
   Environment:
@@ -138,6 +141,44 @@ Resources:
           KeyType: HASH
         - AttributeName: date
           KeyType: RANGE
+
+  # Photos metadata table
+  PhotosTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub babys-calendar-photos-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: photoId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: photoId
+          KeyType: RANGE
+
+  # Subscriptions table (Yoco payments + plan status)
+  SubscriptionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub babys-calendar-subscriptions-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
 
   # ──────────────────────────────────────────────
   # S3 Bucket for photos (encrypted, versioned)
@@ -331,6 +372,79 @@ Resources:
           Properties:
             RestApiId: !Ref ApiGateway
             Path: /photos/upload-url
+            Method: POST
+
+  # Photo metadata CRUD
+  GetPhotosFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.PhotosFunctions::GetPhotos
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref PhotosTable
+        - S3ReadPolicy:
+            BucketName: !Ref PhotosBucket
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /photos
+            Method: GET
+
+  SavePhotoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.PhotosFunctions::SavePhoto
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PhotosTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /photos
+            Method: POST
+
+  # Subscription management + Yoco payment
+  GetSubscriptionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.SubscriptionFunctions::GetSubscription
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref SubscriptionsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref PhotosTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref EventsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /subscription
+            Method: GET
+
+  ProcessPaymentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.SubscriptionFunctions::ProcessPayment
+      CodeUri: ./src/BabysCalendar.Api/
+      Timeout: 60
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SubscriptionsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /subscription/pay
             Method: POST
 
   # Scheduled reminder sender (runs daily at 8 AM SAST / 6 AM UTC)
