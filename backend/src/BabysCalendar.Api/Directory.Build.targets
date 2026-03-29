@@ -1,0 +1,18 @@
+<Project>
+  <!--
+    Workaround for MSB3094 when cross publishing net8.0 from SDK 9 on Windows to linux x64.
+    The output flag causes RelativePath metadata to resolve identically for all items,
+    collapsing DestinationFiles to 1 item while SourceFiles has 12+.
+    Fix: Set RelativePath to Filename+Extension before the copy target runs.
+  -->
+  <Target Name="_FixPublishRelativePath" 
+          BeforeTargets="_CopyResolvedFilesToPublishPreserveNewest"
+          DependsOnTargets="_ComputeResolvedFilesToPublishTypes"
+          Condition="'$(RuntimeIdentifier)' != ''">
+    <ItemGroup>
+      <_ResolvedFileToPublishPreserveNewest>
+        <RelativePath>%(Filename)%(Extension)</RelativePath>
+      </_ResolvedFileToPublishPreserveNewest>
+    </ItemGroup>
+  </Target>
+</Project>

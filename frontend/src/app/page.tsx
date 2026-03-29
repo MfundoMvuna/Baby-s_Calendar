@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { format, addDays, parseISO } from "date-fns";
-import { Plus, Baby, Heart, Menu, X } from "lucide-react";
+import { Plus, Baby, Heart, Menu, X, LogOut } from "lucide-react";
 
+import { useAuth } from "@/components/AuthProvider";
+import AuthScreen from "@/components/AuthScreen";
 import OnboardingFlow from "@/components/OnboardingFlow";
 import PregnancyCalendar from "@/components/PregnancyCalendar";
 import TrimesterProgress from "@/components/TrimesterProgress";
@@ -29,6 +31,7 @@ import { calculateEDD, dateForWeek, formatDate, generateId, getCurrentWeek } fro
 type Tab = "calendar" | "checkin" | "photos";
 
 export default function HomePage() {
+  const { user, loading: authLoading, handleSignOut } = useAuth();
   const [record, setRecord] = useState<PregnancyRecord | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [photos, setPhotos] = useState<PhotoRecord[]>([]);
@@ -171,6 +174,23 @@ export default function HomePage() {
   // Wait for client-side hydration
   if (!mounted) return null;
 
+  // Auth loading
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-white to-purple-50">
+        <div className="flex items-center gap-3 animate-pulse">
+          <Baby className="w-10 h-10 text-primary-500" />
+          <span className="text-primary-400 font-medium">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Not signed in
+  if (!user) {
+    return <AuthScreen />;
+  }
+
   // Onboarding
   if (!record) {
     return <OnboardingFlow onComplete={handleOnboarding} />;
@@ -193,6 +213,13 @@ export default function HomePage() {
             <span className="hidden sm:block text-sm text-purple-500 font-medium">
               Week {currentWeek}
             </span>
+            <button
+              onClick={handleSignOut}
+              title="Sign out"
+              className="p-2 rounded-lg hover:bg-primary-50 text-gray-400 hover:text-primary-500"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
             {/* Mobile menu toggle */}
             <button
               onClick={() => setMenuOpen(!menuOpen)}

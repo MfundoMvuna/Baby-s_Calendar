@@ -11,6 +11,7 @@ import type {
   SymptomEntry,
 } from "./types";
 import { calculateEDD, generateId, getCurrentWeek } from "./utils";
+import { fetchAuthSession } from "aws-amplify/auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -126,10 +127,19 @@ export function savePhotoRecord(photo: Omit<PhotoRecord, "photoId" | "userId">):
 // ─── Remote API (when backend is configured) ───────
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  let authHeader: Record<string, string> = {};
+  try {
+    const session = await fetchAuthSession();
+    const token = session.tokens?.idToken?.toString();
+    if (token) authHeader = { Authorization: token };
+  } catch {
+    // no session — request will be sent without auth
+  }
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...authHeader,
       ...init?.headers,
     },
   });

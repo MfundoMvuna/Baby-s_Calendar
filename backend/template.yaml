@@ -343,7 +343,7 @@ Resources:
         - DynamoDBReadPolicy:
             TableName: !Ref EventsTable
         - SNSPublishMessagePolicy:
-            TopicArn: !Ref NotificationsTopic
+            TopicName: !GetAtt NotificationsTopic.TopicName
       Events:
         DailySchedule:
           Type: Schedule
