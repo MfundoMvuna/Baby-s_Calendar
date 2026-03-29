@@ -107,3 +107,6 @@ NEXT_PUBLIC_API_URL=https://xxxxxxxxxx.execute-api.af-south-1.amazonaws.com/dev
 | Auth           | Amazon Cognito                     |
 | Notifications  | Amazon SNS                         |
 | Region         | af-south-1 (Cape Town)             |
+
+
+by: Mfundo Mvuna
