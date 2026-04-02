@@ -102,6 +102,32 @@ export default function HomePage() {
     }
   }, [isPremiumEmail, subscription]);
 
+  // ── Trimester celebration detection ──
+  // First trimester ends at week 13 → celebrate when entering week 14
+  // Second trimester ends at week 26 → celebrate when entering week 27
+  const currentWeek = record ? getCurrentWeek(record.lmpDate) : 0;
+  const completedTrimester: "first" | "second" | null =
+    currentWeek >= 14 && currentWeek <= 16 ? "first"
+    : currentWeek >= 27 && currentWeek <= 29 ? "second"
+    : null;
+
+  // Show celebration if not yet dismissed in this milestone window
+  useEffect(() => {
+    if (!completedTrimester || confettiDismissed) return;
+    const storageKey = `celebration_${completedTrimester}_seen`;
+    if (!localStorage.getItem(storageKey)) {
+      setShowConfetti(true);
+    }
+  }, [completedTrimester, confettiDismissed]);
+
+  function handleDismissConfetti() {
+    if (completedTrimester) {
+      localStorage.setItem(`celebration_${completedTrimester}_seen`, "true");
+    }
+    setShowConfetti(false);
+    setConfettiDismissed(true);
+  }
+
   /** Seed default milestone events once on first setup */
   const seedDefaults = useCallback(
     (lmpDate: string) => {
@@ -273,33 +299,6 @@ export default function HomePage() {
   // Onboarding
   if (!record) {
     return <OnboardingFlow onComplete={handleOnboarding} />;
-  }
-
-  const currentWeek = getCurrentWeek(record.lmpDate);
-
-  // ── Trimester celebration detection ──
-  // First trimester ends at week 13 → celebrate when entering week 14
-  // Second trimester ends at week 26 → celebrate when entering week 27
-  const completedTrimester: "first" | "second" | null =
-    currentWeek >= 14 && currentWeek <= 16 ? "first"
-    : currentWeek >= 27 && currentWeek <= 29 ? "second"
-    : null;
-
-  // Show celebration if not yet dismissed in this milestone window
-  useEffect(() => {
-    if (!completedTrimester || confettiDismissed) return;
-    const storageKey = `celebration_${completedTrimester}_seen`;
-    if (!localStorage.getItem(storageKey)) {
-      setShowConfetti(true);
-    }
-  }, [completedTrimester, confettiDismissed]);
-
-  function handleDismissConfetti() {
-    if (completedTrimester) {
-      localStorage.setItem(`celebration_${completedTrimester}_seen`, "true");
-    }
-    setShowConfetti(false);
-    setConfettiDismissed(true);
   }
 
   /** Photos for a selected calendar date */
