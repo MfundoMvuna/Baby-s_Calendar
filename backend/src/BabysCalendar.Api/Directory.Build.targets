@@ -1,18 +1,23 @@
 <Project>
   <!--
-    Workaround for MSB3094 when cross publishing net8.0 from SDK 9 on Windows to linux x64.
-    The output flag causes RelativePath metadata to resolve identically for all items,
-    collapsing DestinationFiles to 1 item while SourceFiles has 12+.
-    Fix: Set RelativePath to Filename+Extension before the copy target runs.
+    Workaround for MSB3094 in .NET SDK 9.0.308 when publishing net8.0 projects.
+    The SDK's _CopyResolvedFilesToPublishPreserveNewest target uses DestinationFiles
+    with %(RelativePath), but the metadata collapses to 1 item while SourceFiles has 12+.
+    Fix: Override the target to use DestinationFolder (flat copy) instead of DestinationFiles.
+    Lambda deployment packages are flat, so subdirectory structure is not needed.
   -->
-  <Target Name="_FixPublishRelativePath" 
-          BeforeTargets="_CopyResolvedFilesToPublishPreserveNewest"
+  <Target Name="_CopyResolvedFilesToPublishPreserveNewest"
           DependsOnTargets="_ComputeResolvedFilesToPublishTypes"
-          Condition="'$(RuntimeIdentifier)' != ''">
-    <ItemGroup>
-      <_ResolvedFileToPublishPreserveNewest>
-        <RelativePath>%(Filename)%(Extension)</RelativePath>
-      </_ResolvedFileToPublishPreserveNewest>
-    </ItemGroup>
+          Condition="'@(_ResolvedFileToPublishPreserveNewest)' != ''">
+    <Copy SourceFiles="@(_ResolvedFileToPublishPreserveNewest)"
+          DestinationFolder="$(PublishDir)"
+          OverwriteReadOnlyFiles="$(OverwriteReadOnlyFiles)"
+          Retries="$(CopyRetryCount)"
+          RetryDelayMilliseconds="$(CopyRetryDelayMilliseconds)"
+          UseHardlinksIfPossible="$(CreateHardLinksForPublishFilesIfPossible)"
+          UseSymboliclinksIfPossible="$(CreateSymbolicLinksForPublishFilesIfPossible)"
+          SkipUnchangedFiles="true">
+      <Output TaskParameter="DestinationFiles" ItemName="FileWrites"/>
+    </Copy>
   </Target>
 </Project>
