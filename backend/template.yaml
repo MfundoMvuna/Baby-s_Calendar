@@ -21,7 +21,7 @@ Globals:
         PHOTOS_TABLE_NAME: !Ref PhotosTable
         SUBSCRIPTIONS_TABLE_NAME: !Ref SubscriptionsTable
         SNS_TOPIC_ARN: !Ref NotificationsTopic
-        YOCO_SECRET_KEY: !Sub "{{resolve:ssm:/babys-calendar/${Environment}/yoco-secret-key:1}}"
+        YOCO_SECRET_KEY: !Ref YocoSecretKey
 
 Parameters:
   Environment:
@@ -31,6 +31,10 @@ Parameters:
   CognitoDomain:
     Type: String
     Default: babys-calendar
+  YocoSecretKey:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /babys-calendar/dev/yoco-secret-key
+    NoEcho: true
 
 Resources:
   # ──────────────────────────────────────────────
