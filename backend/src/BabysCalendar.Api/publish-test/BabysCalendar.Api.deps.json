@@ -1,0 +1,165 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0/linux-x64",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {},
+    ".NETCoreApp,Version=v8.0/linux-x64": {
+      "BabysCalendar.Api/1.0.0": {
+        "dependencies": {
+          "AWSSDK.DynamoDBv2": "3.7.513.1",
+          "AWSSDK.S3": "3.7.511.5",
+          "AWSSDK.SimpleNotificationService": "3.7.502.58",
+          "Amazon.Lambda.APIGatewayEvents": "2.7.1",
+          "Amazon.Lambda.CloudWatchEvents": "4.4.1",
+          "Amazon.Lambda.Core": "2.3.0",
+          "Amazon.Lambda.Serialization.SystemTextJson": "2.4.3"
+        },
+        "runtime": {
+          "BabysCalendar.Api.dll": {}
+        }
+      },
+      "Amazon.Lambda.APIGatewayEvents/2.7.1": {
+        "runtime": {
+          "lib/net8.0/Amazon.Lambda.APIGatewayEvents.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.2.0.0"
+          }
+        }
+      },
+      "Amazon.Lambda.CloudWatchEvents/4.4.1": {
+        "runtime": {
+          "lib/net8.0/Amazon.Lambda.CloudWatchEvents.dll": {
+            "assemblyVersion": "0.0.0.0",
+            "fileVersion": "0.0.0.0"
+          }
+        }
+      },
+      "Amazon.Lambda.Core/2.3.0": {
+        "runtime": {
+          "lib/net8.0/Amazon.Lambda.Core.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "Amazon.Lambda.Serialization.SystemTextJson/2.4.3": {
+        "dependencies": {
+          "Amazon.Lambda.Core": "2.3.0"
+        },
+        "runtime": {
+          "lib/net8.0/Amazon.Lambda.Serialization.SystemTextJson.dll": {
+            "assemblyVersion": "0.0.0.0",
+            "fileVersion": "0.0.0.0"
+          }
+        }
+      },
+      "AWSSDK.Core/3.7.500.95": {
+        "runtime": {
+          "lib/net8.0/AWSSDK.Core.dll": {
+            "assemblyVersion": "3.3.0.0",
+            "fileVersion": "3.7.500.95"
+          }
+        }
+      },
+      "AWSSDK.DynamoDBv2/3.7.513.1": {
+        "dependencies": {
+          "AWSSDK.Core": "3.7.500.95"
+        },
+        "runtime": {
+          "lib/net8.0/AWSSDK.DynamoDBv2.dll": {
+            "assemblyVersion": "3.3.0.0",
+            "fileVersion": "3.7.513.1"
+          }
+        }
+      },
+      "AWSSDK.S3/3.7.511.5": {
+        "dependencies": {
+          "AWSSDK.Core": "3.7.500.95"
+        },
+        "runtime": {
+          "lib/net8.0/AWSSDK.S3.dll": {
+            "assemblyVersion": "3.3.0.0",
+            "fileVersion": "3.7.511.5"
+          }
+        }
+      },
+      "AWSSDK.SimpleNotificationService/3.7.502.58": {
+        "dependencies": {
+          "AWSSDK.Core": "3.7.500.95"
+        },
+        "runtime": {
+          "lib/net8.0/AWSSDK.SimpleNotificationService.dll": {
+            "assemblyVersion": "3.3.0.0",
+            "fileVersion": "3.7.502.58"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "BabysCalendar.Api/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Amazon.Lambda.APIGatewayEvents/2.7.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-ORuKOBjquor/clDL5ogeUoKEHt/iRmaC673gFpNzpwF5VkJ7LRvQc4MYnkeIexnXEwdS7yTkM4eSu9wzORi/wg==",
+      "path": "amazon.lambda.apigatewayevents/2.7.1",
+      "hashPath": "amazon.lambda.apigatewayevents.2.7.1.nupkg.sha512"
+    },
+    "Amazon.Lambda.CloudWatchEvents/4.4.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-4ePRyn9XVfAiIIZ6UU+QdJKTgxmQNP9OUmJPtfaKjyVO462/M1f0C6NLX72YNOgGCUQ+SIOQ7Si3PhiprJSfWw==",
+      "path": "amazon.lambda.cloudwatchevents/4.4.1",
+      "hashPath": "amazon.lambda.cloudwatchevents.4.4.1.nupkg.sha512"
+    },
+    "Amazon.Lambda.Core/2.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-GTZcqjNO87uaozSJpF8FxMuSgN5CX7GdXoLWp+rhF27MBmRtnTHCoGS69J0gSWnbsfVqh8DZIE5QOoP4BVxuOQ==",
+      "path": "amazon.lambda.core/2.3.0",
+      "hashPath": "amazon.lambda.core.2.3.0.nupkg.sha512"
+    },
+    "Amazon.Lambda.Serialization.SystemTextJson/2.4.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-z953iA/X1APxBeYblKASZnJYRe2dIqArP+MIsEq6cF/7EI+p+8Uzh01m/NgZgvAiimWOapGplioqPKDQN9Qubw==",
+      "path": "amazon.lambda.serialization.systemtextjson/2.4.3",
+      "hashPath": "amazon.lambda.serialization.systemtextjson.2.4.3.nupkg.sha512"
+    },
+    "AWSSDK.Core/3.7.500.95": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-q0iRQctC0n98mmqc5qksC7zNSl8ozBzyTFaCdcUtACsw5RXx5dO2EeO+AP9daVTLLszHXL61CZ7JCj8CwRMdow==",
+      "path": "awssdk.core/3.7.500.95",
+      "hashPath": "awssdk.core.3.7.500.95.nupkg.sha512"
+    },
+    "AWSSDK.DynamoDBv2/3.7.513.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-rtkpz4r+M3z1SKAwDM0Htdu5JLLOB6jxKVfUqfsck1SY8gV8iQTcGnxXBn4tD6bjHJRrwwA16RGCjKGpDcGC1Q==",
+      "path": "awssdk.dynamodbv2/3.7.513.1",
+      "hashPath": "awssdk.dynamodbv2.3.7.513.1.nupkg.sha512"
+    },
+    "AWSSDK.S3/3.7.511.5": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-+QaExRqAPOb5qAMQ9JOeWAofmef8poChLRgZsefpiLos6AFpOVoRzwkwgkp5H1ajCc7OMDldUC2oVAt4hAPdyg==",
+      "path": "awssdk.s3/3.7.511.5",
+      "hashPath": "awssdk.s3.3.7.511.5.nupkg.sha512"
+    },
+    "AWSSDK.SimpleNotificationService/3.7.502.58": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-2iAR/wlZDcFrX2+ID/r0uKg9eQ4/yM2QZfbDqbRcLH/3gfu4rpAJmrf/9AhD/Gaw/Y/a6dgjysvb9NcvWTvehg==",
+      "path": "awssdk.simplenotificationservice/3.7.502.58",
+      "hashPath": "awssdk.simplenotificationservice.3.7.502.58.nupkg.sha512"
+    }
+  }
+}
