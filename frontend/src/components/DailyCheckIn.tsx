@@ -50,6 +50,13 @@ export default function DailyCheckIn({ onSave }: Props) {
       notes: notes || undefined,
     });
     setSaved(true);
+    // Reset form after saving
+    setMood(3);
+    setSymptoms([]);
+    setWeight("");
+    setBpSystolic("");
+    setBpDiastolic("");
+    setNotes("");
     setTimeout(() => setSaved(false), 2000);
   }
 

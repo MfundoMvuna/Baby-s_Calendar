@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { format, addDays, parseISO } from "date-fns";
-import { Plus, Baby, Heart, Menu, X, LogOut, Crown, Camera } from "lucide-react";
+import { Plus, Baby, Heart, Menu, X, LogOut, Crown, Camera, UserCircle, Shield } from "lucide-react";
 import Script from "next/script";
 
 import { useAuth } from "@/components/AuthProvider";
@@ -15,6 +15,7 @@ import PhotoGallery from "@/components/PhotoGallery";
 import Profile from "@/components/Profile";
 import Insights from "@/components/Insights";
 import Paywall from "@/components/Paywall";
+import AdminPanel from "@/components/AdminPanel";
 
 import type { CalendarEvent, ExtendedProfile, OnboardingData, PhotoRecord, PregnancyRecord, SubscriptionStatus, SymptomEntry } from "@/lib/types";
 import { DEFAULT_MILESTONES } from "@/lib/clinical-timeline";
@@ -49,6 +50,7 @@ export default function HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
   const [extendedProfile, setExtendedProfile] = useState<ExtendedProfile>({});
 
   // Subscription state
@@ -288,7 +290,7 @@ export default function HomePage() {
               Baby&apos;s Calendar
             </h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <span className="hidden sm:block text-sm text-purple-500 font-medium">
               Week {currentWeek}
             </span>
@@ -305,6 +307,14 @@ export default function HomePage() {
                 <Crown className="w-3 h-3" /> Premium
               </span>
             )}
+            {/* Profile button — always visible */}
+            <button
+              onClick={() => setShowProfile(true)}
+              className="p-2 rounded-lg hover:bg-primary-50 text-primary-400 hover:text-primary-600 transition-colors"
+              title="My Profile"
+            >
+              <UserCircle className="w-5 h-5" />
+            </button>
             <button
               onClick={handleSignOut}
               title="Sign out"
@@ -329,10 +339,12 @@ export default function HomePage() {
               <button className="self-end mb-2" onClick={() => setMenuOpen(false)} aria-label="Close menu">
                 <X className="w-5 h-5 text-primary-600" />
               </button>
-              <button className="text-left text-primary-700 font-medium py-2 px-2 rounded hover:bg-primary-50" onClick={() => { setShowProfile(true); setMenuOpen(false); }}>
-                Profile
+              <button className="text-left text-primary-700 font-medium py-2 px-2 rounded hover:bg-primary-50 flex items-center gap-2" onClick={() => { setShowProfile(true); setMenuOpen(false); }}>
+                <UserCircle className="w-4 h-4" /> Profile
               </button>
-              {/* Add more menu items here if needed */}
+              <button className="text-left text-primary-700 font-medium py-2 px-2 rounded hover:bg-primary-50 flex items-center gap-2" onClick={() => { setShowAdmin(true); setMenuOpen(false); }}>
+                <Shield className="w-4 h-4" /> Admin Panel
+              </button>
             </div>
           </div>
         )}
@@ -362,10 +374,14 @@ export default function HomePage() {
       </nav>
 
       {/* ── Main content ── */}
-      {showProfile && onboardingData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      {/* Admin panel — full-screen overlay */}
+      {showAdmin && (
+        <AdminPanel onClose={() => setShowAdmin(false)} />
+      )}
+      {showProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
           <Profile
-            data={onboardingData}
+            data={onboardingData ?? { displayName: "", lmpDate: record.lmpDate, hasSeenDoctor: false, riskFactors: record.riskFactors }}
             extendedProfile={extendedProfile}
             onSave={(data, ext) => {
               handleOnboarding(data);

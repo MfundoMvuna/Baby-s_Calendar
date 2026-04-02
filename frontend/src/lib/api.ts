@@ -15,6 +15,7 @@ import type {
   SymptomEntry,
 } from "./types";
 import { calculateEDD, generateId, getCurrentWeek } from "./utils";
+import { moderateContent } from "./content-moderation";
 import { fetchAuthSession } from "aws-amplify/auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -276,13 +277,19 @@ export function getLocalPosts(): CommunityPost[] {
 
 export function saveLocalPost(input: CreatePostInput): CommunityPost {
   const posts = getLocalPosts();
+  // Run auto-moderation at creation time
+  const modResult = moderateContent(input.content);
+  const autoStatus: CommunityPost["status"] =
+    modResult.autoAction === "approve" ? "approved"
+    : modResult.autoAction === "reject" ? "rejected"
+    : "pending"; // flagged → pending for manual review
   const post: CommunityPost = {
     postId: generateId(),
     userId: "local-user",
     displayName: input.displayName,
     content: input.content,
     category: input.category,
-    status: "pending",
+    status: autoStatus,
     upvotes: 0,
     downvotes: 0,
     reportCount: 0,
@@ -326,4 +333,44 @@ export function reportLocalPost(postId: string): void {
   // Auto-hide if too many reports
   if (posts[idx].reportCount >= 3) posts[idx].status = "rejected";
   lsSet("community_posts", posts);
+}
+
+// ─── Admin: moderation helpers ─────────────────
+
+export function getAllLocalPosts(): CommunityPost[] {
+  return lsGet<CommunityPost[]>("community_posts", []);
+}
+
+export function updateLocalPostStatus(postId: string, status: CommunityPost["status"]): void {
+  const posts = getLocalPosts();
+  const idx = posts.findIndex((p) => p.postId === postId);
+  if (idx < 0) return;
+  posts[idx].status = status;
+  lsSet("community_posts", posts);
+}
+
+export function deleteLocalPost(postId: string): void {
+  const posts = getLocalPosts().filter((p) => p.postId !== postId);
+  lsSet("community_posts", posts);
+}
+
+// ─── Admin PIN (localStorage) ──────────────────
+
+const ADMIN_PIN_KEY = "admin_pin";
+
+export function getAdminPin(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(ADMIN_PIN_KEY);
+}
+
+export function setAdminPin(pin: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(ADMIN_PIN_KEY, pin);
+}
+
+export function verifyAdminPin(pin: string): boolean {
+  const stored = getAdminPin();
+  // First-time setup: no pin stored yet
+  if (!stored) return false;
+  return stored === pin;
 }

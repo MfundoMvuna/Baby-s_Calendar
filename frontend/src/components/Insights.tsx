@@ -12,6 +12,7 @@ import {
   getLocalPosts, saveLocalPost, voteLocalPost, reportLocalPost, remoteApi,
 } from "@/lib/api";
 import { getTipsForWeek } from "@/lib/pregnancy-tips";
+import { moderateContent } from "@/lib/content-moderation";
 import DailyCheckIn from "./DailyCheckIn";
 
 type SubTab = "checkin" | "tips" | "community" | "trends";
@@ -96,7 +97,7 @@ const Insights: React.FC<InsightsProps> = ({
 
   // ── Community handlers ──
   async function handleCreatePost() {
-    if (!newPostContent.trim()) return;
+    if (!newPostContent.trim() || posting) return;
     setPosting(true);
     const input = { content: newPostContent.trim(), category: newPostCategory, displayName };
     try {
@@ -104,11 +105,17 @@ const Insights: React.FC<InsightsProps> = ({
         const post = await remoteApi.createPost(input);
         setPosts((prev) => [post, ...prev]);
       } else {
-        const post = saveLocalPost(input);
+        saveLocalPost(input);
         setPosts(getLocalPosts());
       }
-      setNewPostContent("");
-    } catch { /* fallback silently */ }
+    } catch {
+      // Fallback to local even if remote failed
+      saveLocalPost(input);
+      setPosts(getLocalPosts());
+    }
+    // Always clear form
+    setNewPostContent("");
+    setNewPostCategory("experience");
     setPosting(false);
   }
 
@@ -132,7 +139,9 @@ const Insights: React.FC<InsightsProps> = ({
   }
 
   // Only show approved posts (or all posts offline for now, with pending message)
-  const visiblePosts = posts.filter((p) => p.status === "approved" || p.status === "pending");
+  const visiblePosts = posts
+    .filter((p) => p.status === "approved" || p.status === "pending")
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   return (
     <div className="space-y-4">
