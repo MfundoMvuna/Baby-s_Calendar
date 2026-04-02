@@ -39,10 +39,9 @@ import { calculateEDD, dateForWeek, formatDate, generateId, getCurrentWeek } fro
 
 type Tab = "calendar" | "insights" | "photos";
 
-/** Admin-only emails */
-const ADMIN_EMAILS = ["nosiphos153@gmail.com", "mvunam@gmail.com"];
-/** Premium-override emails (always treated as premium) */
-const PREMIUM_EMAILS = ["nosiphos153@gmail.com", "mvunam@gmail.com"];
+/** Admin & premium emails — loaded from env so they stay out of source control */
+const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? "").split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
+const PREMIUM_EMAILS = (process.env.NEXT_PUBLIC_PREMIUM_EMAILS ?? "").split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
 
 export default function HomePage() {
   const { user, loading: authLoading, handleSignOut } = useAuth();
@@ -64,8 +63,8 @@ export default function HomePage() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [confettiDismissed, setConfettiDismissed] = useState(false);
 
-  const isAdmin = ADMIN_EMAILS.includes(user?.email ?? "");
-  const isPremiumEmail = PREMIUM_EMAILS.includes(user?.email ?? "");
+  const isAdmin = ADMIN_EMAILS.includes((user?.email ?? "").toLowerCase());
+  const isPremiumEmail = PREMIUM_EMAILS.includes((user?.email ?? "").toLowerCase());
 
   // New event form state
   const [newTitle, setNewTitle] = useState("");
