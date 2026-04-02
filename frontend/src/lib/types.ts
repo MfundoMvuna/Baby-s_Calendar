@@ -78,6 +78,24 @@ export interface OnboardingData {
   extraNotes?: string;
 }
 
+// ── Extended Profile ────────────────────────────
+
+export interface ExtendedProfile {
+  dateOfBirth?: string;        // ISO date — for age-based risk
+  height?: number;             // cm
+  prePregnancyWeight?: number; // kg
+  cycleLength?: number;        // days (default 28) — for accurate EDD
+  gravida?: number;            // total pregnancies including current
+  para?: number;               // total births
+  bloodType?: string;          // A+, A-, B+, B-, AB+, AB-, O+, O-
+  allergies?: string[];
+  currentMedications?: string[];
+  medicalAidName?: string;
+  medicalAidNumber?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+}
+
 // ── Subscription / Payment ─────────────────────
 
 export interface SubscriptionStatus {
@@ -93,4 +111,30 @@ export interface SubscriptionLimits {
   maxPhotos: number;
   maxCustomEvents: number;
   isPremium: boolean;
+}
+
+// ── Community Posts ────────────────────────────
+
+export type PostCategory = "tip" | "experience" | "hospital-review" | "question";
+export type PostStatus = "pending" | "approved" | "rejected";
+
+export interface CommunityPost {
+  postId: string;
+  userId: string;
+  displayName: string;
+  content: string;
+  category: PostCategory;
+  status: PostStatus;
+  upvotes: number;
+  downvotes: number;
+  reportCount: number;
+  createdAt: string;
+  /** Which users have voted (keyed by `userId → "up" | "down"`) */
+  votes?: Record<string, "up" | "down">;
+}
+
+export interface CreatePostInput {
+  content: string;
+  category: PostCategory;
+  displayName: string;
 }

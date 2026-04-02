@@ -5,6 +5,9 @@
 
 import type {
   CalendarEvent,
+  CommunityPost,
+  CreatePostInput,
+  ExtendedProfile,
   OnboardingData,
   PhotoRecord,
   PregnancyRecord,
@@ -42,14 +45,22 @@ export function getPregnancyRecord(): PregnancyRecord | null {
   return lsGet<PregnancyRecord | null>("pregnancy_record", null);
 }
 
+export function getOnboardingData(): OnboardingData | null {
+  return lsGet<OnboardingData | null>("onboarding_data", null);
+}
+
 export function savePregnancyRecord(data: OnboardingData): PregnancyRecord {
-  const edd = calculateEDD(data.lmpDate);
+  // Save full onboarding data for Profile editing
+  lsSet("onboarding_data", data);
+
+  const extProfile = getExtendedProfile();
+  const edd = calculateEDD(data.lmpDate, extProfile.cycleLength);
   const record: PregnancyRecord = {
     userId: "local-user",
     lmpDate: data.lmpDate,
     eddDate: edd,
     currentWeek: data.weeksPregnant ?? getCurrentWeek(data.lmpDate),
-    parity: 0,
+    parity: extProfile.para ?? 0,
     riskFactors: data.riskFactors,
     babyNickname: data.babyNickname,
   };
@@ -218,4 +229,101 @@ export const remoteApi = {
       body: JSON.stringify({ token: yocoToken }),
     });
   },
+
+  // ── Community Posts ──────────────────────────
+
+  async getPosts(): Promise<CommunityPost[]> {
+    return apiFetch<CommunityPost[]>("/community/posts");
+  },
+
+  async createPost(input: CreatePostInput): Promise<CommunityPost> {
+    return apiFetch<CommunityPost>("/community/posts", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+
+  async votePost(postId: string, vote: "up" | "down"): Promise<void> {
+    await apiFetch(`/community/posts/${postId}/vote`, {
+      method: "POST",
+      body: JSON.stringify({ vote }),
+    });
+  },
+
+  async reportPost(postId: string, reason: string): Promise<void> {
+    await apiFetch(`/community/posts/${postId}/report`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    });
+  },
 };
+
+// ─── Extended Profile (localStorage) ───────────
+
+export function getExtendedProfile(): ExtendedProfile {
+  return lsGet<ExtendedProfile>("extended_profile", {});
+}
+
+export function saveExtendedProfile(profile: ExtendedProfile): void {
+  lsSet("extended_profile", profile);
+}
+
+// ─── Community Posts (localStorage fallback) ───
+
+export function getLocalPosts(): CommunityPost[] {
+  return lsGet<CommunityPost[]>("community_posts", []);
+}
+
+export function saveLocalPost(input: CreatePostInput): CommunityPost {
+  const posts = getLocalPosts();
+  const post: CommunityPost = {
+    postId: generateId(),
+    userId: "local-user",
+    displayName: input.displayName,
+    content: input.content,
+    category: input.category,
+    status: "pending",
+    upvotes: 0,
+    downvotes: 0,
+    reportCount: 0,
+    createdAt: new Date().toISOString(),
+    votes: {},
+  };
+  posts.push(post);
+  lsSet("community_posts", posts);
+  return post;
+}
+
+export function voteLocalPost(postId: string, vote: "up" | "down"): void {
+  const posts = getLocalPosts();
+  const idx = posts.findIndex((p) => p.postId === postId);
+  if (idx < 0) return;
+  const post = posts[idx];
+  const prevVote = post.votes?.["local-user"];
+
+  // Remove previous vote
+  if (prevVote === "up") post.upvotes = Math.max(0, post.upvotes - 1);
+  if (prevVote === "down") post.downvotes = Math.max(0, post.downvotes - 1);
+
+  // Toggle: if same vote again, just remove it
+  if (prevVote === vote) {
+    delete post.votes?.["local-user"];
+  } else {
+    if (vote === "up") post.upvotes++;
+    else post.downvotes++;
+    post.votes = { ...(post.votes ?? {}), ["local-user"]: vote };
+  }
+
+  posts[idx] = post;
+  lsSet("community_posts", posts);
+}
+
+export function reportLocalPost(postId: string): void {
+  const posts = getLocalPosts();
+  const idx = posts.findIndex((p) => p.postId === postId);
+  if (idx < 0) return;
+  posts[idx].reportCount++;
+  // Auto-hide if too many reports
+  if (posts[idx].reportCount >= 3) posts[idx].status = "rejected";
+  lsSet("community_posts", posts);
+}

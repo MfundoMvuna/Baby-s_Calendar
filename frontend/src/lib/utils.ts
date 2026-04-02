@@ -7,10 +7,12 @@ import { addDays, differenceInWeeks, differenceInDays, format, parseISO } from "
 /** Standard pregnancy duration in days */
 const PREGNANCY_DAYS = 280; // 40 weeks
 
-/** Calculate EDD from LMP date */
-export function calculateEDD(lmpDate: string): string {
+/** Calculate EDD from LMP date, optionally adjusted for cycle length (modified Naegele's rule) */
+export function calculateEDD(lmpDate: string, cycleLength?: number): string {
   const lmp = parseISO(lmpDate);
-  return format(addDays(lmp, PREGNANCY_DAYS), "yyyy-MM-dd");
+  // Modified Naegele's rule: LMP + 280 days + (cycleLength - 28) days
+  const adjustment = cycleLength && cycleLength !== 28 ? cycleLength - 28 : 0;
+  return format(addDays(lmp, PREGNANCY_DAYS + adjustment), "yyyy-MM-dd");
 }
 
 /** Calculate current gestational week from LMP */

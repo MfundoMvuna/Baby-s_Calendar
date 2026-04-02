@@ -12,10 +12,11 @@ import PregnancyCalendar from "@/components/PregnancyCalendar";
 import TrimesterProgress from "@/components/TrimesterProgress";
 import EventDetailPanel from "@/components/EventDetailPanel";
 import PhotoGallery from "@/components/PhotoGallery";
-import DailyCheckIn from "@/components/DailyCheckIn";
+import Profile from "@/components/Profile";
+import Insights from "@/components/Insights";
 import Paywall from "@/components/Paywall";
 
-import type { CalendarEvent, OnboardingData, PhotoRecord, PregnancyRecord, SubscriptionStatus, SymptomEntry } from "@/lib/types";
+import type { CalendarEvent, ExtendedProfile, OnboardingData, PhotoRecord, PregnancyRecord, SubscriptionStatus, SymptomEntry } from "@/lib/types";
 import { DEFAULT_MILESTONES } from "@/lib/clinical-timeline";
 import {
   getPregnancyRecord,
@@ -27,15 +28,19 @@ import {
   savePhotoRecord,
   getSymptomEntries,
   saveSymptomEntry,
+  getExtendedProfile,
+  saveExtendedProfile,
+  getOnboardingData,
   remoteApi,
 } from "@/lib/api";
 import { calculateEDD, dateForWeek, formatDate, generateId, getCurrentWeek } from "@/lib/utils";
 
-type Tab = "calendar" | "checkin" | "photos";
+type Tab = "calendar" | "insights" | "photos";
 
 export default function HomePage() {
   const { user, loading: authLoading, handleSignOut } = useAuth();
   const [record, setRecord] = useState<PregnancyRecord | null>(null);
+  const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [photos, setPhotos] = useState<PhotoRecord[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -43,6 +48,8 @@ export default function HomePage() {
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [extendedProfile, setExtendedProfile] = useState<ExtendedProfile>({});
 
   // Subscription state
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
@@ -56,8 +63,10 @@ export default function HomePage() {
   // Load data from localStorage on mount + fetch remote data
   useEffect(() => {
     setRecord(getPregnancyRecord());
+    setOnboardingData(getOnboardingData());
     setEvents(getEvents());
     setPhotos(getPhotos());
+    setExtendedProfile(getExtendedProfile());
     setMounted(true);
 
     // Fetch subscription status and remote photos when backend is available
@@ -103,6 +112,7 @@ export default function HomePage() {
 
     const rec = savePregnancyRecord(data);
     setRecord(rec);
+    setOnboardingData(data);
     const seeded = seedDefaults(rec.lmpDate);
     setEvents(seeded);
   }
@@ -306,23 +316,36 @@ export default function HomePage() {
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               className="sm:hidden p-2 rounded-lg hover:bg-primary-50"
+              aria-label="Open menu"
             >
               {menuOpen ? <X className="w-5 h-5 text-primary-600" /> : <Menu className="w-5 h-5 text-primary-600" />}
             </button>
           </div>
         </div>
+        {/* Burger menu drawer */}
+        {menuOpen && (
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setMenuOpen(false)}>
+            <div className="fixed top-0 right-0 w-64 h-full bg-white shadow-lg p-6 flex flex-col gap-4" onClick={e => e.stopPropagation()}>
+              <button className="self-end mb-2" onClick={() => setMenuOpen(false)} aria-label="Close menu">
+                <X className="w-5 h-5 text-primary-600" />
+              </button>
+              <button className="text-left text-primary-700 font-medium py-2 px-2 rounded hover:bg-primary-50" onClick={() => { setShowProfile(true); setMenuOpen(false); }}>
+                Profile
+              </button>
+              {/* Add more menu items here if needed */}
+            </div>
+          </div>
+        )}
       </header>
 
       {/* ── Tab bar ── */}
       <nav className="sticky top-[57px] z-20 bg-white/80 backdrop-blur-md border-b border-primary-50">
         <div className="max-w-5xl mx-auto flex">
-          {(
-            [
-              { key: "calendar", label: "Calendar" },
-              { key: "checkin", label: "Check-in" },
-              { key: "photos", label: "Photos" },
-            ] as { key: Tab; label: string }[]
-          ).map((tab) => (
+          {([
+            { key: "calendar", label: "Calendar" },
+            { key: "insights", label: "Insights ✨" },
+            { key: "photos", label: "Photos" },
+          ] as { key: Tab; label: string }[]).map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
@@ -339,6 +362,21 @@ export default function HomePage() {
       </nav>
 
       {/* ── Main content ── */}
+      {showProfile && onboardingData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <Profile
+            data={onboardingData}
+            extendedProfile={extendedProfile}
+            onSave={(data, ext) => {
+              handleOnboarding(data);
+              saveExtendedProfile(ext);
+              setExtendedProfile(ext);
+              setShowProfile(false);
+            }}
+            onClose={() => setShowProfile(false)}
+          />
+        </div>
+      )}
       <main className="max-w-5xl mx-auto p-4 space-y-4">
         {activeTab === "calendar" && (
           <>
@@ -512,8 +550,17 @@ export default function HomePage() {
           </>
         )}
 
-        {activeTab === "checkin" && <DailyCheckIn onSave={handleCheckIn} />}
-
+        {activeTab === "insights" && (
+          <Insights
+            photos={photos}
+            symptoms={getSymptomEntries()}
+            events={events}
+            currentWeek={currentWeek}
+            displayName={onboardingData?.displayName ?? "Mama"}
+            subscription={subscription}
+            onCheckIn={handleCheckIn}
+          />
+        )}
         {activeTab === "photos" && (
           <PhotoGallery photos={photos} onUpload={handlePhotoUpload} />
         )}
