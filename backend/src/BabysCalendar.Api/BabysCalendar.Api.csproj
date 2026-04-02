@@ -17,4 +17,30 @@
     <PackageReference Include="AWSSDK.S3" Version="3.7.*" />
     <PackageReference Include="AWSSDK.SimpleNotificationService" Version="3.7.*" />
   </ItemGroup>
+
+  <!--
+    Workaround: .NET SDK 9.0.308 _CopyResolvedFilesToPublishPreserveNewest has a
+    DestinationFiles / SourceFiles count mismatch when publishing net8.0 projects.
+    We replace that target with a flat DestinationFolder copy.
+    AfterTargets ensures this definition loads AFTER the SDK targets.
+  -->
+  <Target Name="FixPublishPreserveNewest"
+          AfterTargets="_ComputeResolvedFilesToPublishTypes"
+          BeforeTargets="_CopyResolvedFilesToPublishPreserveNewest"
+          Condition="'@(_ResolvedFileToPublishPreserveNewest)' != ''">
+    <Copy SourceFiles="@(_ResolvedFileToPublishPreserveNewest)"
+          DestinationFolder="$(PublishDir)"
+          OverwriteReadOnlyFiles="$(OverwriteReadOnlyFiles)"
+          Retries="$(CopyRetryCount)"
+          RetryDelayMilliseconds="$(CopyRetryDelayMilliseconds)"
+          UseHardlinksIfPossible="$(CreateHardLinksForPublishFilesIfPossible)"
+          UseSymboliclinksIfPossible="$(CreateSymbolicLinksForPublishFilesIfPossible)"
+          SkipUnchangedFiles="true">
+      <Output TaskParameter="DestinationFiles" ItemName="FileWrites"/>
+    </Copy>
+    <!-- Clear the items so the original target has nothing to copy -->
+    <ItemGroup>
+      <_ResolvedFileToPublishPreserveNewest Remove="@(_ResolvedFileToPublishPreserveNewest)" />
+    </ItemGroup>
+  </Target>
 </Project>
