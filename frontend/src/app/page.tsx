@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { format, addDays, parseISO } from "date-fns";
-import { Plus, Baby, Heart, Menu, X, LogOut, Crown, Camera, UserCircle, Shield } from "lucide-react";
+import { Plus, Baby, Heart, X, LogOut, Crown, Camera, UserCircle, Shield } from "lucide-react";
 import Script from "next/script";
 
 import { useAuth } from "@/components/AuthProvider";
@@ -16,6 +16,7 @@ import Profile from "@/components/Profile";
 import Insights from "@/components/Insights";
 import Paywall from "@/components/Paywall";
 import AdminPanel from "@/components/AdminPanel";
+import TrimesterCelebration from "@/components/TrimesterCelebration";
 
 import type { CalendarEvent, ExtendedProfile, OnboardingData, PhotoRecord, PregnancyRecord, SubscriptionStatus, SymptomEntry } from "@/lib/types";
 import { DEFAULT_MILESTONES } from "@/lib/clinical-timeline";
@@ -38,6 +39,11 @@ import { calculateEDD, dateForWeek, formatDate, generateId, getCurrentWeek } fro
 
 type Tab = "calendar" | "insights" | "photos";
 
+/** Admin-only emails */
+const ADMIN_EMAILS = ["nosiphos153@gmail.com", "mvunam@gmail.com"];
+/** Premium-override emails (always treated as premium) */
+const PREMIUM_EMAILS = ["nosiphos153@gmail.com", "mvunam@gmail.com"];
+
 export default function HomePage() {
   const { user, loading: authLoading, handleSignOut } = useAuth();
   const [record, setRecord] = useState<PregnancyRecord | null>(null);
@@ -47,7 +53,6 @@ export default function HomePage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("calendar");
   const [showAddEvent, setShowAddEvent] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
@@ -56,6 +61,11 @@ export default function HomePage() {
   // Subscription state
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [confettiDismissed, setConfettiDismissed] = useState(false);
+
+  const isAdmin = ADMIN_EMAILS.includes(user?.email ?? "");
+  const isPremiumEmail = PREMIUM_EMAILS.includes(user?.email ?? "");
 
   // New event form state
   const [newTitle, setNewTitle] = useState("");
@@ -79,6 +89,19 @@ export default function HomePage() {
       }).catch(() => {});
     }
   }, []);
+
+  // Override subscription to premium for hardcoded emails
+  useEffect(() => {
+    if (isPremiumEmail && (!subscription || !subscription.limits.isPremium)) {
+      setSubscription({
+        plan: "premium",
+        status: "active",
+        photoCount: 0,
+        customEventCount: 0,
+        limits: { maxPhotos: 999, maxCustomEvents: 999, isPremium: true },
+      });
+    }
+  }, [isPremiumEmail, subscription]);
 
   /** Seed default milestone events once on first setup */
   const seedDefaults = useCallback(
@@ -255,6 +278,31 @@ export default function HomePage() {
 
   const currentWeek = getCurrentWeek(record.lmpDate);
 
+  // ── Trimester celebration detection ──
+  // First trimester ends at week 13 → celebrate when entering week 14
+  // Second trimester ends at week 26 → celebrate when entering week 27
+  const completedTrimester: "first" | "second" | null =
+    currentWeek >= 14 && currentWeek <= 16 ? "first"
+    : currentWeek >= 27 && currentWeek <= 29 ? "second"
+    : null;
+
+  // Show celebration if not yet dismissed in this milestone window
+  useEffect(() => {
+    if (!completedTrimester || confettiDismissed) return;
+    const storageKey = `celebration_${completedTrimester}_seen`;
+    if (!localStorage.getItem(storageKey)) {
+      setShowConfetti(true);
+    }
+  }, [completedTrimester, confettiDismissed]);
+
+  function handleDismissConfetti() {
+    if (completedTrimester) {
+      localStorage.setItem(`celebration_${completedTrimester}_seen`, "true");
+    }
+    setShowConfetti(false);
+    setConfettiDismissed(true);
+  }
+
   /** Photos for a selected calendar date */
   const selectedDatePhotos = selectedDate
     ? photos.filter((p) => p.date === format(selectedDate, "yyyy-MM-dd"))
@@ -281,6 +329,15 @@ export default function HomePage() {
           onClose={() => setShowPaywall(false)}
         />
       )}
+      {/* Trimester celebration overlay */}
+      {showConfetti && completedTrimester && (
+        <TrimesterCelebration
+          babyNickname={record.babyNickname}
+          motherName={onboardingData?.displayName}
+          trimester={completedTrimester}
+          onDismiss={handleDismissConfetti}
+        />
+      )}
       {/* ── Top bar ── */}
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-primary-100 px-4 py-3">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
@@ -297,7 +354,7 @@ export default function HomePage() {
             {subscription && !subscription.limits.isPremium && (
               <button
                 onClick={() => setShowPaywall(true)}
-                className="hidden sm:flex items-center gap-1 text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1.5 rounded-full hover:shadow-md transition"
+                className="flex items-center gap-1 text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1.5 rounded-full hover:shadow-md transition"
               >
                 <Crown className="w-3 h-3" /> Upgrade
               </button>
@@ -322,41 +379,27 @@ export default function HomePage() {
             >
               <LogOut className="w-4 h-4" />
             </button>
-            {/* Mobile menu toggle */}
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="sm:hidden p-2 rounded-lg hover:bg-primary-50"
-              aria-label="Open menu"
-            >
-              {menuOpen ? <X className="w-5 h-5 text-primary-600" /> : <Menu className="w-5 h-5 text-primary-600" />}
-            </button>
+            {/* Admin button — only for admin emails */}
+            {isAdmin && (
+              <button
+                onClick={() => setShowAdmin(true)}
+                className="p-2 rounded-lg hover:bg-primary-50 text-primary-400 hover:text-primary-600 transition-colors"
+                title="Admin Panel"
+              >
+                <Shield className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>
-        {/* Burger menu drawer */}
-        {menuOpen && (
-          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setMenuOpen(false)}>
-            <div className="fixed top-0 right-0 w-64 h-full bg-white shadow-lg p-6 flex flex-col gap-4" onClick={e => e.stopPropagation()}>
-              <button className="self-end mb-2" onClick={() => setMenuOpen(false)} aria-label="Close menu">
-                <X className="w-5 h-5 text-primary-600" />
-              </button>
-              <button className="text-left text-primary-700 font-medium py-2 px-2 rounded hover:bg-primary-50 flex items-center gap-2" onClick={() => { setShowProfile(true); setMenuOpen(false); }}>
-                <UserCircle className="w-4 h-4" /> Profile
-              </button>
-              <button className="text-left text-primary-700 font-medium py-2 px-2 rounded hover:bg-primary-50 flex items-center gap-2" onClick={() => { setShowAdmin(true); setMenuOpen(false); }}>
-                <Shield className="w-4 h-4" /> Admin Panel
-              </button>
-            </div>
-          </div>
-        )}
       </header>
 
       {/* ── Tab bar ── */}
       <nav className="sticky top-[57px] z-20 bg-white/80 backdrop-blur-md border-b border-primary-50">
         <div className="max-w-5xl mx-auto flex">
           {([
-            { key: "calendar", label: "Calendar" },
+            { key: "calendar", label: "📅 Calendar" },
             { key: "insights", label: "Insights ✨" },
-            { key: "photos", label: "Photos" },
+            { key: "photos", label: "📸 Photos" },
           ] as { key: Tab; label: string }[]).map((tab) => (
             <button
               key={tab.key}
@@ -390,6 +433,8 @@ export default function HomePage() {
               setShowProfile(false);
             }}
             onClose={() => setShowProfile(false)}
+            subscription={subscription}
+            onShowPaywall={() => { setShowProfile(false); setShowPaywall(true); }}
           />
         </div>
       )}

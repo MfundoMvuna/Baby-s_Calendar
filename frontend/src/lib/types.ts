@@ -138,3 +138,24 @@ export interface CreatePostInput {
   category: PostCategory;
   displayName: string;
 }
+
+// ── Partner Sharing ────────────────────────────
+
+export interface PartnerLink {
+  partnerId: string;        // unique share code
+  partnerEmail: string;     // partner's email
+  partnerName: string;      // display name
+  status: "pending" | "active" | "revoked";
+  createdAt: string;
+  lastAccessedAt?: string;
+}
+
+// ── Google Calendar Sync ───────────────────────
+
+export interface CalendarSyncConfig {
+  enabled: boolean;
+  googleCalendarId?: string;
+  lastSyncedAt?: string;
+  syncEvents: boolean;       // sync appointments to Google Cal
+  syncReminders: boolean;    // sync reminders to Google Cal
+}

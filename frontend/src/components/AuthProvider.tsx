@@ -16,6 +16,8 @@ import {
   confirmSignUp,
   getCurrentUser,
   fetchAuthSession,
+  resetPassword,
+  confirmResetPassword,
   type SignInOutput,
 } from "aws-amplify/auth";
 
@@ -42,6 +44,8 @@ interface AuthContextValue {
   handleSignUp: (email: string, password: string) => Promise<void>;
   handleConfirmSignUp: (email: string, code: string) => Promise<void>;
   handleSignOut: () => Promise<void>;
+  handleForgotPassword: (email: string) => Promise<void>;
+  handleConfirmResetPassword: (email: string, code: string, newPassword: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -140,6 +144,34 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const handleForgotPassword = useCallback(
+    async (email: string) => {
+      setError(null);
+      try {
+        await resetPassword({ username: email });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Failed to send reset code";
+        setError(msg);
+        throw e;
+      }
+    },
+    []
+  );
+
+  const handleConfirmResetPassword = useCallback(
+    async (email: string, code: string, newPassword: string) => {
+      setError(null);
+      try {
+        await confirmResetPassword({ username: email, confirmationCode: code, newPassword });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Password reset failed";
+        setError(msg);
+        throw e;
+      }
+    },
+    []
+  );
+
   const handleSignOut = useCallback(async () => {
     await signOut();
     setUser(null);
@@ -156,6 +188,8 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         handleSignUp,
         handleConfirmSignUp,
         handleSignOut,
+        handleForgotPassword,
+        handleConfirmResetPassword,
         clearError,
       }}
     >

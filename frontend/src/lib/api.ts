@@ -5,10 +5,12 @@
 
 import type {
   CalendarEvent,
+  CalendarSyncConfig,
   CommunityPost,
   CreatePostInput,
   ExtendedProfile,
   OnboardingData,
+  PartnerLink,
   PhotoRecord,
   PregnancyRecord,
   SubscriptionStatus,
@@ -373,4 +375,63 @@ export function verifyAdminPin(pin: string): boolean {
   // First-time setup: no pin stored yet
   if (!stored) return false;
   return stored === pin;
+}
+
+/** Reset PIN after re-authentication */
+export function resetAdminPin(newPin: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(ADMIN_PIN_KEY, newPin);
+}
+
+// ─── Partner Sharing (localStorage) ────────────
+
+const PARTNER_LINK_KEY = "partner_link";
+
+export function getPartnerLink(): PartnerLink | null {
+  return lsGet<PartnerLink | null>(PARTNER_LINK_KEY, null);
+}
+
+export function createPartnerLink(email: string, name: string): PartnerLink {
+  const link: PartnerLink = {
+    partnerId: generateId(),
+    partnerEmail: email,
+    partnerName: name,
+    status: "pending",
+    createdAt: new Date().toISOString(),
+  };
+  lsSet(PARTNER_LINK_KEY, link);
+  return link;
+}
+
+export function updatePartnerLink(patch: Partial<PartnerLink>): void {
+  const link = getPartnerLink();
+  if (!link) return;
+  lsSet(PARTNER_LINK_KEY, { ...link, ...patch });
+}
+
+export function revokePartnerLink(): void {
+  const link = getPartnerLink();
+  if (!link) return;
+  lsSet(PARTNER_LINK_KEY, { ...link, status: "revoked" as const });
+}
+
+export function removePartnerLink(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(PARTNER_LINK_KEY);
+}
+
+// ─── Google Calendar Sync (localStorage) ───────
+
+const CAL_SYNC_KEY = "calendar_sync_config";
+
+export function getCalendarSyncConfig(): CalendarSyncConfig {
+  return lsGet<CalendarSyncConfig>(CAL_SYNC_KEY, {
+    enabled: false,
+    syncEvents: true,
+    syncReminders: true,
+  });
+}
+
+export function saveCalendarSyncConfig(config: CalendarSyncConfig): void {
+  lsSet(CAL_SYNC_KEY, config);
 }
