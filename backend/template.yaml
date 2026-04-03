@@ -8,7 +8,7 @@ Description: >
 Globals:
   Function:
     Runtime: dotnet8
-    MemorySize: 512
+    MemorySize: 256
     Timeout: 30
     Architectures:
       - x86_64
@@ -238,6 +238,11 @@ Resources:
         Authorizers:
           CognitoAuthorizer:
             UserPoolArn: !GetAtt UserPool.Arn
+      MethodSettings:
+        - ResourcePath: /*
+          HttpMethod: '*'
+          ThrottlingBurstLimit: 10
+          ThrottlingRateLimit: 5
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
         AllowHeaders: "'Content-Type,Authorization'"
