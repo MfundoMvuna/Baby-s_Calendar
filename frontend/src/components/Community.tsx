@@ -77,8 +77,11 @@ const Community: React.FC<CommunityProps> = ({ displayName }) => {
     } else {
       fetched = getLocalPosts();
     }
-    // Show only approved posts to regular users
-    fetched = fetched.filter((p) => p.status === "approved");
+    // Backend already returns only approved posts for non-admin callers.
+    // For local fallback, filter to approved only.
+    if (!remoteApi.available) {
+      fetched = fetched.filter((p) => p.status === "approved");
+    }
     fetched.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     setPosts(fetched);
     setLoading(false);

@@ -19,6 +19,7 @@ Globals:
         SYMPTOMS_TABLE_NAME: !Ref SymptomsTable
         COMMUNITY_POSTS_TABLE_NAME: !Ref CommunityPostsTable
         COMMUNITY_COMMENTS_TABLE_NAME: !Ref CommunityCommentsTable
+        SHARE_TOKENS_TABLE_NAME: !Ref ShareTokensTable
         PHOTOS_BUCKET: !Ref PhotosBucket
         PHOTOS_TABLE_NAME: !Ref PhotosTable
         SUBSCRIPTIONS_TABLE_NAME: !Ref SubscriptionsTable
@@ -228,6 +229,23 @@ Resources:
           KeyType: HASH
         - AttributeName: commentId
           KeyType: RANGE
+
+  # Share tokens table (partner sharing with live data)
+  ShareTokensTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub babys-calendar-share-tokens-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: tokenId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: tokenId
+          KeyType: HASH
 
   # ──────────────────────────────────────────────
   # S3 Bucket for photos (encrypted, versioned)
@@ -648,6 +666,65 @@ Resources:
           Properties:
             RestApiId: !Ref ApiGateway
             Path: /community/admin/posts/{postId}
+            Method: DELETE
+
+  # Partner Sharing — server-backed live share tokens
+  CreateShareTokenFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.ShareFunctions::CreateShareToken
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ShareTokensTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /share
+            Method: POST
+
+  GetSharedJourneyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.ShareFunctions::GetSharedJourney
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ShareTokensTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref PregnancyTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref EventsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref SymptomsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref PhotosTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /share/{tokenId}
+            Method: GET
+            Auth:
+              Authorizer: NONE
+
+  RevokeShareTokenFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.ShareFunctions::RevokeShareToken
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ShareTokensTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /share/{tokenId}
             Method: DELETE
 
   # Scheduled reminder sender (runs daily at 8 AM SAST / 6 AM UTC)

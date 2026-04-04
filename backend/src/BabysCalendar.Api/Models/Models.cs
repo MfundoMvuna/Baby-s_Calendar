@@ -325,3 +325,101 @@ public class CreateCommunityCommentRequest
     [JsonPropertyName("displayName")]
     public string DisplayName { get; set; } = string.Empty;
 }
+
+// ── Share Tokens ───────────────────────────────
+
+public class ShareToken
+{
+    [JsonPropertyName("tokenId")]
+    public string TokenId { get; set; } = string.Empty;
+
+    [JsonPropertyName("userId")]
+    public string UserId { get; set; } = string.Empty;
+
+    [JsonPropertyName("partnerEmail")]
+    public string PartnerEmail { get; set; } = string.Empty;
+
+    [JsonPropertyName("partnerName")]
+    public string PartnerName { get; set; } = string.Empty;
+
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = "active";
+
+    [JsonPropertyName("createdAt")]
+    public string CreatedAt { get; set; } = string.Empty;
+}
+
+public class CreateShareTokenRequest
+{
+    [JsonPropertyName("partnerEmail")]
+    public string PartnerEmail { get; set; } = string.Empty;
+
+    [JsonPropertyName("partnerName")]
+    public string PartnerName { get; set; } = string.Empty;
+}
+
+public class SharedJourneyResponse
+{
+    [JsonPropertyName("version")]
+    public int Version { get; set; } = 1;
+
+    [JsonPropertyName("senderName")]
+    public string SenderName { get; set; } = string.Empty;
+
+    [JsonPropertyName("babyNickname")]
+    public string? BabyNickname { get; set; }
+
+    [JsonPropertyName("lmpDate")]
+    public string LmpDate { get; set; } = string.Empty;
+
+    [JsonPropertyName("eddDate")]
+    public string EddDate { get; set; } = string.Empty;
+
+    [JsonPropertyName("currentWeek")]
+    public int CurrentWeek { get; set; }
+
+    [JsonPropertyName("events")]
+    public List<SharedEventItem> Events { get; set; } = new();
+
+    [JsonPropertyName("recentSymptoms")]
+    public List<string> RecentSymptoms { get; set; } = new();
+
+    [JsonPropertyName("photoCount")]
+    public int PhotoCount { get; set; }
+
+    [JsonPropertyName("sharedAt")]
+    public string SharedAt { get; set; } = string.Empty;
+
+    [JsonPropertyName("dataSource")]
+    public string DataSource { get; set; } = "remote";
+
+    [JsonPropertyName("sourceRecords")]
+    public SharedSourceRecords? SourceRecords { get; set; }
+}
+
+public class SharedEventItem
+{
+    [JsonPropertyName("date")]
+    public string Date { get; set; } = string.Empty;
+
+    [JsonPropertyName("title")]
+    public string Title { get; set; } = string.Empty;
+
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = string.Empty;
+
+    [JsonPropertyName("completed")]
+    public bool Completed { get; set; }
+}
+
+public class SharedSourceRecords
+{
+    [JsonPropertyName("events")]
+    public int Events { get; set; }
+
+    [JsonPropertyName("symptomsLast7Days")]
+    public int SymptomsLast7Days { get; set; }
+
+    [JsonPropertyName("photos")]
+    public int Photos { get; set; }
+}

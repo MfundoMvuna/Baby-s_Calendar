@@ -306,6 +306,19 @@ export const remoteApi = {
       method: "DELETE",
     });
   },
+
+  // ── Share Tokens (server-backed partner sharing) ─
+
+  async createShareToken(partnerEmail: string, partnerName: string): Promise<{ tokenId: string }> {
+    return apiFetch<{ tokenId: string }>("/share", {
+      method: "POST",
+      body: JSON.stringify({ partnerEmail, partnerName }),
+    });
+  },
+
+  async revokeShareToken(tokenId: string): Promise<void> {
+    await apiFetch(`/share/${tokenId}`, { method: "DELETE" });
+  },
 };
 
 // ─── Extended Profile (localStorage) ───────────
@@ -545,8 +558,45 @@ export function parseShareToken(token: string): SharedJourney | null {
   }
 }
 
+/**
+ * Fetch shared journey data from the backend using a server-backed token ID.
+ * This is a PUBLIC endpoint — no Cognito auth needed.
+ * Falls back to legacy base64 token parsing if the API call fails.
+ */
+export async function fetchSharedJourney(tokenId: string): Promise<SharedJourney | null> {
+  if (API_BASE) {
+    try {
+      const res = await fetch(`${API_BASE}/share/${encodeURIComponent(tokenId)}`, {
+        headers: { "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const data = (await res.json()) as SharedJourney;
+        if (data.lmpDate && data.eddDate) return data;
+      }
+    } catch {
+      // Fall through to legacy base64 parse
+    }
+  }
+  // Legacy fallback: try to parse as base64url blob
+  return parseShareToken(tokenId);
+}
+
 export async function createPartnerLink(email: string, name: string): Promise<PartnerLink> {
-  const shareToken = await buildShareToken();
+  let tokenId: string | undefined;
+
+  // Try to create a server-backed share token first
+  if (remoteApi.available) {
+    try {
+      const result = await remoteApi.createShareToken(email, name);
+      tokenId = result.tokenId;
+    } catch {
+      // Fall back to legacy base64 token
+    }
+  }
+
+  // Legacy fallback: build a base64 snapshot token
+  const shareToken = tokenId ?? await buildShareToken();
+
   const link: PartnerLink = {
     partnerId: generateId(),
     partnerEmail: email,

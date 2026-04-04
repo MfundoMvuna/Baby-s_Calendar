@@ -36,7 +36,7 @@ import {
   saveExtendedProfile,
   getOnboardingData,
   remoteApi,
-  parseShareToken,
+  fetchSharedJourney,
 } from "@/lib/api";
 import { calculateEDD, dateForWeek, formatDate, generateId, getCurrentWeek } from "@/lib/utils";
 
@@ -69,17 +69,20 @@ export default function HomePage() {
   const isAdmin = ADMIN_EMAILS.includes((user?.email ?? "").toLowerCase());
   const isPremiumEmail = PREMIUM_EMAILS.includes((user?.email ?? "").toLowerCase());
 
-  // Shared journey detection — check URL for ?share=TOKEN
+  // Shared journey detection — check URL for ?share=TOKEN_ID
   const [sharedJourney, setSharedJourney] = useState<SharedJourney | null>(null);
+  const [shareLoading, setShareLoading] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const shareToken = params.get("share") ?? params.get("partner");
     if (shareToken) {
-      const journey = parseShareToken(shareToken);
-      if (journey) {
-        setSharedJourney(journey);
-      }
+      setShareLoading(true);
+      fetchSharedJourney(shareToken)
+        .then((journey) => {
+          if (journey) setSharedJourney(journey);
+        })
+        .finally(() => setShareLoading(false));
     }
   }, []);
 
@@ -368,6 +371,18 @@ export default function HomePage() {
 
   // Wait for client-side hydration
   if (!mounted) return null;
+
+  // ── Share link loading ──
+  if (shareLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-white to-purple-50">
+        <div className="flex items-center gap-3 animate-pulse">
+          <Baby className="w-10 h-10 text-pink-500" />
+          <span className="text-pink-400 font-medium">Loading shared journey...</span>
+        </div>
+      </div>
+    );
+  }
 
   // ── Shared Journey View (partner link opened) ──
   if (sharedJourney) {

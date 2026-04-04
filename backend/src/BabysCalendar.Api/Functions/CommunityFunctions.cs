@@ -69,7 +69,7 @@ public class CommunityFunctions
                 DisplayName = input.DisplayName.Trim(),
                 Content = input.Content.Trim(),
                 Category = NormalizeCategory(input.Category),
-                Status = "pending",
+                Status = "approved",   // auto-approve — admin can reject / report mechanism auto-rejects at 3 reports
                 Upvotes = 0,
                 Downvotes = 0,
                 ReportCount = 0,

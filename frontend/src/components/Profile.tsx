@@ -3,7 +3,7 @@ import { Crown, Users, CalendarSync, Link2, Unlink, Copy, CheckCircle } from "lu
 import type { OnboardingData, ExtendedProfile, PartnerLink, CalendarSyncConfig, SubscriptionStatus } from "@/lib/types";
 import {
   getPartnerLink, createPartnerLink, revokePartnerLink, removePartnerLink,
-  getCalendarSyncConfig, saveCalendarSyncConfig, refreshPartnerShareToken,
+  getCalendarSyncConfig, saveCalendarSyncConfig, remoteApi,
 } from "@/lib/api";
 
 interface ProfileProps {
@@ -250,7 +250,7 @@ const Profile: React.FC<ProfileProps> = ({ data, extendedProfile, onSave, onClos
                   <Users className="w-4 h-4" /> Share with Partner
                 </h3>
                 <p className="text-xs text-gray-500">
-                  Invite your partner to view your calendar, check-ins, and photos. They get <strong>read-only</strong> access — they can see everything but can&apos;t edit.
+                  Invite your partner to view your calendar, check-ins, and photos. They get <strong>read-only</strong> access with <strong>live data</strong> — always up to date, no need to refresh the link.
                 </p>
 
                 {!partnerLink || partnerLink.status === "revoked" ? (
@@ -297,10 +297,8 @@ const Profile: React.FC<ProfileProps> = ({ data, extendedProfile, onSave, onClos
                     <div className="flex gap-2">
                       <button
                         onClick={async () => {
-                          // Refresh the token with latest data before sharing
-                          const updated = await refreshPartnerShareToken();
-                          const token = updated?.shareToken ?? partnerLink.shareToken ?? "";
-                          if (updated) setPartnerLink(updated);
+                          // The shareToken is now a short tokenId for server-backed links
+                          const token = partnerLink.shareToken ?? "";
                           const shareUrl = `${window.location.origin}?share=${token}`;
                           navigator.clipboard.writeText(shareUrl).then(() => {
                             setLinkCopied(true);
@@ -312,7 +310,15 @@ const Profile: React.FC<ProfileProps> = ({ data, extendedProfile, onSave, onClos
                         {linkCopied ? <><CheckCircle className="w-3 h-3" /> Copied!</> : <><Copy className="w-3 h-3" /> Copy Link</>}
                       </button>
                       <button
-                        onClick={() => { revokePartnerLink(); setPartnerLink({ ...partnerLink, status: "revoked" }); }}
+                        onClick={async () => {
+                          // Revoke on server if it's a server-backed token
+                          const token = partnerLink.shareToken ?? "";
+                          if (remoteApi.available && token.length <= 16) {
+                            try { await remoteApi.revokeShareToken(token); } catch { /* best effort */ }
+                          }
+                          revokePartnerLink();
+                          setPartnerLink({ ...partnerLink, status: "revoked" });
+                        }}
                         className="text-xs text-red-400 hover:text-red-600 px-3 py-2 rounded-lg hover:bg-red-50 flex items-center gap-1"
                       >
                         <Unlink className="w-3 h-3" /> Revoke
