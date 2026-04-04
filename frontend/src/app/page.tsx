@@ -653,10 +653,10 @@ export default function HomePage() {
           />
         )}
         {activeTab === "photos" && (
-          
+          <PhotoGallery photos={photos} onUpload={handlePhotoUpload} />
+        )}
         {activeTab === "community" && (
           <Community displayName={onboardingData?.displayName ?? "Anonymous"} />
-        )}<PhotoGallery photos={photos} onUpload={handlePhotoUpload} />
         )}
       </main>
 
