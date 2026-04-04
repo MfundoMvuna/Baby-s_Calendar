@@ -1,6 +1,6 @@
 # Baby's Calendar — Pregnancy Tracker
 
-A warm, supportive pregnancy tracker with an interactive calendar, clinical milestones (SA ANC guidelines), holistic insights hub, pub/sub community forum, token-based partner sharing, photo gallery, trimester celebrations, centralised admin panel, paywall, and appointment reminders.
+A warm, supportive pregnancy tracker with an interactive calendar, clinical milestones (SA ANC guidelines), holistic insights hub, pub/sub community forum, token-based partner sharing, photo gallery, trimester celebrations, centralisedto gallery, trimester celebrations, centralised admin panel, paywall, and appointment reminders.
 
 ## Deployment
 
@@ -24,6 +24,8 @@ Baby's_Calendar/
 │   │   │   ├── AdminPanel.tsx           # Global admin dashboard (Cognito-authenticated, no PIN)
 │   │   │   ├── AuthProvider.tsx         # Cognito auth context
 │   │   │   ├── AuthScreen.tsx           # Sign-in / sign-up / confirm / forgot password
+│   │   │   ├── Community.tsx            # Pub/sub community forum (polling, comments, voting)
+│   │   │   ├── SharedJourneyView.tsx    # Read-only partner view (decoded from share token)
 │   │   │   ├── Community.tsx            # Pub/sub community forum (polling, comments, voting)
 │   │   │   ├── SharedJourneyView.tsx    # Read-only partner view (decoded from share token)
 │   │   │   ├── OnboardingFlow.tsx       # 4-step setup wizard
@@ -125,13 +127,28 @@ aws s3 sync out s3://babys-calendar-web-431071878954 --delete --region af-south-
 - **Holistic Insights hub** — 4 sub-sections:
   - **Daily Check-in** — mood, symptoms, weight, blood pressure logging with streak tracking
   - **Pregnancy Tips** — curated, week-by-week suggestions (nutrition, wellness, exercise, preparation, emotional)
-  - **Community Sharing** — moderated post feed ("IF YOU THINK IT WOULD HELP A FELLOW SISTER — PLEASE SHARE"); categories: tips, experiences, hospital reviews, questions; upvote/downvote (premium-only), report system, content pre-approval
+  - Pub/sub Community Forum** (💬 Community tab) — dedicated tab visible to all logged-in users:
+  - Pub/sub polling (auto-refreshes every 15 s for new approved posts)
+  - Threaded comments on every post
+  - Category filtering (Tips, Experiences, Hospital Reviews, Questions)
+  - Voting (up/down), reporting, optimistic UI updates
+  - Uses remote API when available, falls back to localStorage
+- **Token-based Partner Sharing** — fixed partner sync:
+  - Sender's pregnancy data (events, symptoms, photo count, EDD) is base64url-encoded into a share token
+  - Share link format: `?share=TOKEN` — no account required for the partner
+  - Partner opens the link → sees a read-only view of the sender's journey (progress, upcoming events, recent symptoms, completed milestones)
+  - Token is refreshed with the latest data each time the "Copy Link" button is pressed
+- ****Community Sharing** — moderated post feed ("IF YOU THINK IT WOULD HELP A FELLOW SISTER — PLEASE SHARE"); categories: tips, experiences, hospital reviews, questions; upvote/downvote (premium-only), report system, content pre-approval
   - **Trends** — mood chart, symptom frequency, appointment stats, photo timeline
 - **Pub/sub Community Forum** (💬 Community tab) — dedicated tab visible to all logged-in users:
   - Pub/sub polling (auto-refreshes every 15 s for new approved posts)
   - Threaded comments on every post
   - Category filtering (Tips, Experiences, Hospital Reviews, Questions)
-  - Voting (up/down), reporting, optimistic UI updates
+  - Centralised Admin panel** — single source of truth for all admins:
+  - Access restricted to Cognito-authenticated admin emails (Shield icon)
+  - No per-device PIN — admin identity verified via Cognito JWT + `ADMIN_EMAILS` env var
+  - All admins see the same global post list (fetched from remote API when available)
+  - Bulk auto-moderation, individual approve/reject/delete
   - Uses remote API when available, falls back to localStorage
 - **Token-based Partner Sharing** — fixed partner sync:
   - Sender's pregnancy data (events, symptoms, photo count, EDD) is base64url-encoded into a share token
@@ -146,7 +163,8 @@ aws s3 sync out s3://babys-calendar-web-431071878954 --delete --region af-south-
   - Partner sync & Google Calendar sync (premium)
 - **Centralised Admin panel** — single source of truth for all admins:
   - Access restricted to Cognito-authenticated admin emails (Shield icon)
-  - No per-device PIN — admin identity verified via Cognito JWT + `ADMIN_EMAILS` env var
+  - No per-device PIN — admin identity verified via Cognito JWT + `A
+| Community | 💬 Community | Pub/sub forum — posts, comments, voting, live polling |DMIN_EMAILS` env var
   - All admins see the same global post list (fetched from remote API when available)
   - Bulk auto-moderation, individual approve/reject/delete
 - **Premium access control** — admin & premium emails configured via environment variables (not in source code)
@@ -188,6 +206,15 @@ aws s3 sync out s3://babys-calendar-web-431071878954 --delete --region af-south-
 | Backend        | AWS SAM, C# .NET 8 Lambdas        |
 | Database       | Amazon DynamoDB                    |
 | Storage        | Amazon S3 (KMS encrypted)          |
+## Partner Sharing Flow
+
+1. Mom opens **Profile → Sync → Share with Partner** and enters partner's name & email
+2. A share token is generated containing a snapshot of her pregnancy data (EDD, events, symptoms, photo count)
+3. Mom taps **Copy Link** → link format: `https://baby-s-calendar.vercel.app?share=TOKEN`
+4. Partner opens the link on any device — **no account required**
+5. Partner sees a read-only journey view: progress bar, upcoming events, completed milestones, recent symptoms
+6. Each time Mom copies the link, the token is refreshed with the latest data
+
 | Auth           | Amazon Cognito                     |
 | Payments       | Yoco (ZAR, SA-based)              |
 | Notifications  | Amazon SNS                         |
