@@ -100,6 +100,12 @@ export default function HomePage() {
     // Fetch subscription status and remote photos when backend is available
     if (remoteApi.available) {
       remoteApi.getSubscription().then(setSubscription).catch(() => {});
+      remoteApi.getRecord().then((remoteRecord) => {
+        if (remoteRecord?.lmpDate) setRecord(remoteRecord);
+      }).catch(() => {});
+      remoteApi.getEvents().then((remoteEvents) => {
+        if (remoteEvents.length > 0) setEvents(remoteEvents);
+      }).catch(() => {});
       remoteApi.getPhotos().then((remote) => {
         if (remote.length > 0) setPhotos(remote);
       }).catch(() => {});
@@ -168,7 +174,7 @@ export default function HomePage() {
   );
 
   /** Onboarding complete handler */
-  function handleOnboarding(data: OnboardingData) {
+  async function handleOnboarding(data: OnboardingData) {
     // If user gave weeks instead of LMP, approximate LMP
     let lmpDate = data.lmpDate;
     if (!lmpDate && data.weeksPregnant) {
@@ -177,7 +183,14 @@ export default function HomePage() {
       data.lmpDate = lmpDate;
     }
 
-    const rec = savePregnancyRecord(data);
+    let rec = savePregnancyRecord(data);
+    if (remoteApi.available) {
+      try {
+        rec = await remoteApi.createRecord(data);
+      } catch {
+        // Keep local fallback
+      }
+    }
     setRecord(rec);
     setOnboardingData(data);
     const seeded = seedDefaults(rec.lmpDate);
@@ -190,30 +203,68 @@ export default function HomePage() {
   }
 
   /** Toggle event completion */
-  function handleToggleComplete(eventId: string) {
+  async function handleToggleComplete(eventId: string) {
     const evt = events.find((e) => e.eventId === eventId);
     if (!evt) return;
+
+    if (remoteApi.available) {
+      try {
+        await remoteApi.updateEvent(eventId, { ...evt, completed: !evt.completed });
+        const remoteEvents = await remoteApi.getEvents();
+        setEvents(remoteEvents);
+        return;
+      } catch {
+        // fallback below
+      }
+    }
+
     updateEvent(eventId, { completed: !evt.completed });
     refreshEvents();
   }
 
   /** Save a note on an event */
-  function handleSaveNote(eventId: string, notes: string) {
+  async function handleSaveNote(eventId: string, notes: string) {
+    const evt = events.find((e) => e.eventId === eventId);
+    if (!evt) return;
+
+    if (remoteApi.available) {
+      try {
+        await remoteApi.updateEvent(eventId, { ...evt, notes });
+        const remoteEvents = await remoteApi.getEvents();
+        setEvents(remoteEvents);
+        return;
+      } catch {
+        // fallback below
+      }
+    }
+
     updateEvent(eventId, { notes });
     refreshEvents();
   }
 
   /** Save an answer to a question */
-  function handleSaveAnswer(eventId: string, question: string, answer: string) {
+  async function handleSaveAnswer(eventId: string, question: string, answer: string) {
     const evt = events.find((e) => e.eventId === eventId);
     if (!evt) return;
     const answers = { ...(evt.answers ?? {}), [question]: answer };
+
+    if (remoteApi.available) {
+      try {
+        await remoteApi.updateEvent(eventId, { ...evt, answers });
+        const remoteEvents = await remoteApi.getEvents();
+        setEvents(remoteEvents);
+        return;
+      } catch {
+        // fallback below
+      }
+    }
+
     updateEvent(eventId, { answers });
     refreshEvents();
   }
 
   /** Add a new custom event */
-  function handleAddEvent() {
+  async function handleAddEvent() {
     if (!selectedDate || !newTitle.trim()) return;
 
     // Check free-tier custom event limit
@@ -222,14 +273,28 @@ export default function HomePage() {
       return;
     }
 
-    saveEvent({
+    const input = {
       date: format(selectedDate, "yyyy-MM-dd"),
       title: newTitle,
       description: newDesc,
       type: newType,
       completed: false,
-    });
-    refreshEvents();
+    };
+
+    if (remoteApi.available) {
+      try {
+        await remoteApi.createEvent(input);
+        const remoteEvents = await remoteApi.getEvents();
+        setEvents(remoteEvents);
+      } catch {
+        saveEvent(input);
+        refreshEvents();
+      }
+    } else {
+      saveEvent(input);
+      refreshEvents();
+    }
+
     setNewTitle("");
     setNewDesc("");
     setShowAddEvent(false);
@@ -282,7 +347,15 @@ export default function HomePage() {
   }
 
   /** Symptom check-in handler */
-  function handleCheckIn(entry: Omit<SymptomEntry, "entryId" | "userId">) {
+  async function handleCheckIn(entry: Omit<SymptomEntry, "entryId" | "userId">) {
+    if (remoteApi.available) {
+      try {
+        await remoteApi.createSymptom(entry);
+        return;
+      } catch {
+        // fallback below
+      }
+    }
     saveSymptomEntry(entry);
   }
 

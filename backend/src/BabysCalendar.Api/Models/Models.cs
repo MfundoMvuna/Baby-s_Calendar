@@ -227,3 +227,101 @@ public class SubscriptionLimits
     [JsonPropertyName("isPremium")]
     public bool IsPremium { get; set; }
 }
+
+// ── Community Posts / Comments ─────────────────
+
+public class CommunityPost
+{
+    [JsonPropertyName("postId")]
+    public string PostId { get; set; } = string.Empty;
+
+    [JsonPropertyName("userId")]
+    public string UserId { get; set; } = string.Empty;
+
+    [JsonPropertyName("displayName")]
+    public string DisplayName { get; set; } = string.Empty;
+
+    [JsonPropertyName("content")]
+    public string Content { get; set; } = string.Empty;
+
+    [JsonPropertyName("category")]
+    public string Category { get; set; } = "experience";
+
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = "pending";
+
+    [JsonPropertyName("upvotes")]
+    public int Upvotes { get; set; }
+
+    [JsonPropertyName("downvotes")]
+    public int Downvotes { get; set; }
+
+    [JsonPropertyName("reportCount")]
+    public int ReportCount { get; set; }
+
+    [JsonPropertyName("createdAt")]
+    public string CreatedAt { get; set; } = string.Empty;
+
+    [JsonPropertyName("votes")]
+    public Dictionary<string, string> Votes { get; set; } = new();
+}
+
+public class CreateCommunityPostRequest
+{
+    [JsonPropertyName("content")]
+    public string Content { get; set; } = string.Empty;
+
+    [JsonPropertyName("category")]
+    public string Category { get; set; } = "experience";
+
+    [JsonPropertyName("displayName")]
+    public string DisplayName { get; set; } = string.Empty;
+}
+
+public class VotePostRequest
+{
+    [JsonPropertyName("vote")]
+    public string Vote { get; set; } = string.Empty;
+}
+
+public class ReportPostRequest
+{
+    [JsonPropertyName("reason")]
+    public string Reason { get; set; } = string.Empty;
+}
+
+public class UpdatePostStatusRequest
+{
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = string.Empty;
+}
+
+public class CommunityComment
+{
+    [JsonPropertyName("commentId")]
+    public string CommentId { get; set; } = string.Empty;
+
+    [JsonPropertyName("postId")]
+    public string PostId { get; set; } = string.Empty;
+
+    [JsonPropertyName("userId")]
+    public string UserId { get; set; } = string.Empty;
+
+    [JsonPropertyName("displayName")]
+    public string DisplayName { get; set; } = string.Empty;
+
+    [JsonPropertyName("content")]
+    public string Content { get; set; } = string.Empty;
+
+    [JsonPropertyName("createdAt")]
+    public string CreatedAt { get; set; } = string.Empty;
+}
+
+public class CreateCommunityCommentRequest
+{
+    [JsonPropertyName("content")]
+    public string Content { get; set; } = string.Empty;
+
+    [JsonPropertyName("displayName")]
+    public string DisplayName { get; set; } = string.Empty;
+}

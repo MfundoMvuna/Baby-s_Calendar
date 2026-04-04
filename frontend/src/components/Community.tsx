@@ -96,6 +96,18 @@ const Community: React.FC<CommunityProps> = ({ displayName }) => {
   // ── Load comments for expanded post ──
   useEffect(() => {
     if (!expandedComments) return;
+    if (remoteApi.available) {
+      remoteApi.getComments(expandedComments)
+        .then((postComments) => {
+          setComments((prev) => new Map(prev).set(expandedComments, postComments));
+        })
+        .catch(() => {
+          const postComments = getLocalComments(expandedComments);
+          setComments((prev) => new Map(prev).set(expandedComments, postComments));
+        });
+      return;
+    }
+
     const postComments = getLocalComments(expandedComments);
     setComments((prev) => new Map(prev).set(expandedComments, postComments));
   }, [expandedComments]);
@@ -171,11 +183,22 @@ const Community: React.FC<CommunityProps> = ({ displayName }) => {
     );
   }
 
-  function handleSubmitComment(postId: string) {
+  async function handleSubmitComment(postId: string) {
     const content = commentInputs[postId]?.trim();
     if (!content) return;
     setSubmittingComment(postId);
-    const comment = saveLocalComment(postId, content, displayName);
+
+    let comment: CommunityComment;
+    if (remoteApi.available) {
+      try {
+        comment = await remoteApi.createComment(postId, content, displayName);
+      } catch {
+        comment = saveLocalComment(postId, content, displayName);
+      }
+    } else {
+      comment = saveLocalComment(postId, content, displayName);
+    }
+
     setComments((prev) => {
       const existing = prev.get(postId) ?? [];
       return new Map(prev).set(postId, [...existing, comment]);

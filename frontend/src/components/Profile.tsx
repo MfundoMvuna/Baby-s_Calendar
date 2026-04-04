@@ -270,9 +270,9 @@ const Profile: React.FC<ProfileProps> = ({ data, extendedProfile, onSave, onClos
                       className="w-full text-sm"
                     />
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         if (!partnerEmail || !partnerName) return;
-                        const link = createPartnerLink(partnerEmail, partnerName);
+                        const link = await createPartnerLink(partnerEmail, partnerName);
                         setPartnerLink(link);
                         setPartnerEmail("");
                         setPartnerName("");
@@ -296,9 +296,9 @@ const Profile: React.FC<ProfileProps> = ({ data, extendedProfile, onSave, onClos
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           // Refresh the token with latest data before sharing
-                          const updated = refreshPartnerShareToken();
+                          const updated = await refreshPartnerShareToken();
                           const token = updated?.shareToken ?? partnerLink.shareToken ?? "";
                           if (updated) setPartnerLink(updated);
                           const shareUrl = `${window.location.origin}?share=${token}`;

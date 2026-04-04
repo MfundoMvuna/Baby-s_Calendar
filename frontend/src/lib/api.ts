@@ -186,6 +186,21 @@ export const remoteApi = {
       body: JSON.stringify(event),
     });
   },
+  async updateEvent(eventId: string, patch: Partial<CalendarEvent>): Promise<CalendarEvent> {
+    return apiFetch<CalendarEvent>(`/events/${eventId}`, {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    });
+  },
+  async getSymptoms(): Promise<SymptomEntry[]> {
+    return apiFetch<SymptomEntry[]>("/symptoms");
+  },
+  async createSymptom(entry: Omit<SymptomEntry, "entryId" | "userId">): Promise<SymptomEntry> {
+    return apiFetch<SymptomEntry>("/symptoms", {
+      method: "POST",
+      body: JSON.stringify(entry),
+    });
+  },
   async getUploadUrl(filename: string): Promise<{ uploadUrl: string; s3Key: string }> {
     return apiFetch("/photos/upload-url", {
       method: "POST",
@@ -238,8 +253,9 @@ export const remoteApi = {
 
   // ── Community Posts ──────────────────────────
 
-  async getPosts(): Promise<CommunityPost[]> {
-    return apiFetch<CommunityPost[]>("/community/posts");
+  async getPosts(options?: { includeAll?: boolean }): Promise<CommunityPost[]> {
+    const query = options?.includeAll ? "?all=true" : "";
+    return apiFetch<CommunityPost[]>(`/community/posts${query}`);
   },
 
   async createPost(input: CreatePostInput): Promise<CommunityPost> {
@@ -260,6 +276,34 @@ export const remoteApi = {
     await apiFetch(`/community/posts/${postId}/report`, {
       method: "POST",
       body: JSON.stringify({ reason }),
+    });
+  },
+
+  async getComments(postId: string): Promise<CommunityComment[]> {
+    return apiFetch<CommunityComment[]>(`/community/posts/${postId}/comments`);
+  },
+
+  async createComment(postId: string, content: string, displayName: string): Promise<CommunityComment> {
+    return apiFetch<CommunityComment>(`/community/posts/${postId}/comments`, {
+      method: "POST",
+      body: JSON.stringify({ content, displayName }),
+    });
+  },
+
+  async getAdminPosts(): Promise<CommunityPost[]> {
+    return apiFetch<CommunityPost[]>("/community/admin/posts");
+  },
+
+  async updatePostStatus(postId: string, status: CommunityPost["status"]): Promise<void> {
+    await apiFetch(`/community/admin/posts/${postId}/status`, {
+      method: "PUT",
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  async deletePost(postId: string): Promise<void> {
+    await apiFetch(`/community/admin/posts/${postId}`, {
+      method: "DELETE",
     });
   },
 };
@@ -394,14 +438,44 @@ export function getPartnerLink(): PartnerLink | null {
   return lsGet<PartnerLink | null>(PARTNER_LINK_KEY, null);
 }
 
-/** Build a base64url-encoded share token from the sender's current data */
-export function buildShareToken(): string {
+type ShareSnapshot = {
+  record: PregnancyRecord;
+  events: CalendarEvent[];
+  symptoms: SymptomEntry[];
+  photos: PhotoRecord[];
+  source: "remote" | "local";
+};
+
+async function getShareSnapshot(): Promise<ShareSnapshot> {
+  if (remoteApi.available) {
+    try {
+      const [record, events, symptoms, photos] = await Promise.all([
+        remoteApi.getRecord(),
+        remoteApi.getEvents(),
+        remoteApi.getSymptoms(),
+        remoteApi.getPhotos(),
+      ]);
+      return { record, events, symptoms, photos, source: "remote" };
+    } catch {
+      // Fall back to local snapshot if remote fetch fails.
+    }
+  }
+
   const record = getPregnancyRecord();
   if (!record) throw new Error("No pregnancy record to share");
 
-  const events = getEvents();
-  const symptoms = getSymptomEntries();
-  const photos = getPhotos();
+  return {
+    record,
+    events: getEvents(),
+    symptoms: getSymptomEntries(),
+    photos: getPhotos(),
+    source: "local",
+  };
+}
+
+/** Build a base64url-encoded share token from the sender's current data */
+export async function buildShareToken(): Promise<string> {
+  const { record, events, symptoms, photos, source } = await getShareSnapshot();
 
   // Collect recent symptom names (last 7 days)
   const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
@@ -433,12 +507,21 @@ export function buildShareToken(): string {
     recentSymptoms,
     photoCount: photos.length,
     sharedAt: new Date().toISOString(),
+    dataSource: source,
+    sourceRecords: {
+      events: events.length,
+      symptomsLast7Days: recentSymptoms.length,
+      photos: photos.length,
+    },
   };
 
   // Store the display name from onboarding if available
   const onboarding = getOnboardingData();
   if (onboarding?.displayName) {
     payload.senderName = onboarding.displayName;
+  } else {
+    const fromRecord = (record as PregnancyRecord & { displayName?: string }).displayName;
+    if (fromRecord) payload.senderName = fromRecord;
   }
 
   const json = JSON.stringify(payload);
@@ -462,8 +545,8 @@ export function parseShareToken(token: string): SharedJourney | null {
   }
 }
 
-export function createPartnerLink(email: string, name: string): PartnerLink {
-  const shareToken = buildShareToken();
+export async function createPartnerLink(email: string, name: string): Promise<PartnerLink> {
+  const shareToken = await buildShareToken();
   const link: PartnerLink = {
     partnerId: generateId(),
     partnerEmail: email,
@@ -477,10 +560,10 @@ export function createPartnerLink(email: string, name: string): PartnerLink {
 }
 
 /** Refresh the share token with the latest data */
-export function refreshPartnerShareToken(): PartnerLink | null {
+export async function refreshPartnerShareToken(): Promise<PartnerLink | null> {
   const link = getPartnerLink();
   if (!link || link.status === "revoked") return link;
-  const shareToken = buildShareToken();
+  const shareToken = await buildShareToken();
   const updated = { ...link, shareToken };
   lsSet(PARTNER_LINK_KEY, updated);
   return updated;

@@ -9,25 +9,60 @@ namespace BabysCalendar.Api.Helpers;
 /// </summary>
 public static class AuthHelper
 {
+    public static string? GetEmail(APIGatewayProxyRequest request) =>
+        GetClaim(request, "email");
+
+    public static bool IsAdmin(APIGatewayProxyRequest request)
+    {
+        var email = GetEmail(request)?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(email)) return false;
+
+        var adminsRaw = Environment.GetEnvironmentVariable("ADMIN_EMAILS") ?? string.Empty;
+        var admins = adminsRaw
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(e => e.ToLowerInvariant())
+            .ToHashSet();
+
+        return admins.Contains(email);
+    }
+
     public static string GetUserId(APIGatewayProxyRequest request)
     {
-        // API Gateway Cognito authorizer puts claims in requestContext
-        if (request.RequestContext?.Authorizer != null &&
-            request.RequestContext.Authorizer.TryGetValue("claims", out var claimsObj) &&
-            claimsObj is Dictionary<string, string> claims &&
-            claims.TryGetValue("sub", out var sub))
-        {
-            return sub;
-        }
-
-        // Fallback: check for "sub" directly in authorizer map
-        if (request.RequestContext?.Authorizer != null &&
-            request.RequestContext.Authorizer.TryGetValue("sub", out var directSub) &&
-            directSub is string subStr)
-        {
-            return subStr;
-        }
+        var sub = GetClaim(request, "sub");
+        if (!string.IsNullOrEmpty(sub)) return sub;
 
         throw new UnauthorizedAccessException("User identity not found in request.");
+    }
+
+    private static string? GetClaim(APIGatewayProxyRequest request, string claimName)
+    {
+        if (request.RequestContext?.Authorizer == null) return null;
+
+        if (request.RequestContext.Authorizer.TryGetValue("claims", out var claimsObj))
+        {
+            if (claimsObj is Dictionary<string, string> sClaims &&
+                sClaims.TryGetValue(claimName, out var claimValue) &&
+                !string.IsNullOrEmpty(claimValue))
+            {
+                return claimValue;
+            }
+
+            if (claimsObj is Dictionary<string, object> oClaims &&
+                oClaims.TryGetValue(claimName, out var oValue) &&
+                oValue != null)
+            {
+                var objectClaimValue = oValue.ToString();
+                if (!string.IsNullOrEmpty(objectClaimValue)) return objectClaimValue;
+            }
+        }
+
+        if (request.RequestContext.Authorizer.TryGetValue(claimName, out var directValue) &&
+            directValue != null)
+        {
+            var directClaimValue = directValue.ToString();
+            if (!string.IsNullOrEmpty(directClaimValue)) return directClaimValue;
+        }
+
+        return null;
     }
 }

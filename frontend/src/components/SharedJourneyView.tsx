@@ -114,6 +114,18 @@ const SharedJourneyView: React.FC<SharedJourneyViewProps> = ({ journey, onClose 
           </div>
         </div>
 
+        <div className="card p-4 bg-gray-50">
+          <h3 className="text-sm font-bold text-gray-700 mb-2">Read-only data source</h3>
+          <p className="text-xs text-gray-500">
+            Source: {journey.dataSource === "remote" ? "Cloud records" : "Device snapshot"}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            Included records: {journey.sourceRecords?.events ?? journey.events.length} events,
+            {" "}{journey.sourceRecords?.symptomsLast7Days ?? journey.recentSymptoms.length} recent symptom tags,
+            {" "}{journey.sourceRecords?.photos ?? journey.photoCount} photos.
+          </p>
+        </div>
+
         {/* Recent symptoms */}
         {journey.recentSymptoms.length > 0 && (
           <div className="card p-4">

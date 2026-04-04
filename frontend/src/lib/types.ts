@@ -163,6 +163,12 @@ export interface SharedJourney {
   recentSymptoms: string[];
   photoCount: number;
   sharedAt: string;          // ISO timestamp
+  dataSource?: "remote" | "local";
+  sourceRecords?: {
+    events: number;
+    symptomsLast7Days: number;
+    photos: number;
+  };
 }
 
 export interface SharedEvent {

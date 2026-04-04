@@ -66,7 +66,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     let allPosts: CommunityPost[] = [];
     if (remoteApi.available) {
       try {
-        allPosts = await remoteApi.getPosts();
+        allPosts = await remoteApi.getAdminPosts();
       } catch {
         allPosts = getAllLocalPosts();
       }
@@ -84,20 +84,46 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   }
 
   // ── Actions ──
-  function handleApprove(postId: string) {
+  async function handleApprove(postId: string) {
+    if (remoteApi.available) {
+      try {
+        await remoteApi.updatePostStatus(postId, "approved");
+        await refreshPosts();
+        return;
+      } catch {
+        // fallback below
+      }
+    }
     updateLocalPostStatus(postId, "approved");
-    refreshPosts();
+    await refreshPosts();
   }
 
-  function handleReject(postId: string) {
+  async function handleReject(postId: string) {
+    if (remoteApi.available) {
+      try {
+        await remoteApi.updatePostStatus(postId, "rejected");
+        await refreshPosts();
+        return;
+      } catch {
+        // fallback below
+      }
+    }
     updateLocalPostStatus(postId, "rejected");
-    refreshPosts();
+    await refreshPosts();
   }
 
-  function handleDelete(postId: string) {
-    deleteLocalPost(postId);
+  async function handleDelete(postId: string) {
+    if (remoteApi.available) {
+      try {
+        await remoteApi.deletePost(postId);
+      } catch {
+        deleteLocalPost(postId);
+      }
+    } else {
+      deleteLocalPost(postId);
+    }
     setConfirmDelete(null);
-    refreshPosts();
+    await refreshPosts();
   }
 
   /** Auto-moderate all pending posts based on the content engine */
@@ -105,18 +131,34 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     setBulkProcessing(true);
     const allPosts = posts;
     let changed = 0;
-    allPosts.forEach((p) => {
-      if (p.status !== "pending") return;
+    for (const p of allPosts) {
+      if (p.status !== "pending") continue;
       const result = moderateContent(p.content);
       if (result.autoAction === "approve") {
-        updateLocalPostStatus(p.postId, "approved");
+        if (remoteApi.available) {
+          try {
+            await remoteApi.updatePostStatus(p.postId, "approved");
+          } catch {
+            updateLocalPostStatus(p.postId, "approved");
+          }
+        } else {
+          updateLocalPostStatus(p.postId, "approved");
+        }
         changed++;
       } else if (result.autoAction === "reject") {
-        updateLocalPostStatus(p.postId, "rejected");
+        if (remoteApi.available) {
+          try {
+            await remoteApi.updatePostStatus(p.postId, "rejected");
+          } catch {
+            updateLocalPostStatus(p.postId, "rejected");
+          }
+        } else {
+          updateLocalPostStatus(p.postId, "rejected");
+        }
         changed++;
       }
       // "flag" stays pending for manual review
-    });
+    }
     await refreshPosts();
     setBulkProcessing(false);
   }

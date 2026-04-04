@@ -17,10 +17,13 @@ Globals:
         TABLE_NAME: !Ref PregnancyTable
         EVENTS_TABLE_NAME: !Ref EventsTable
         SYMPTOMS_TABLE_NAME: !Ref SymptomsTable
+        COMMUNITY_POSTS_TABLE_NAME: !Ref CommunityPostsTable
+        COMMUNITY_COMMENTS_TABLE_NAME: !Ref CommunityCommentsTable
         PHOTOS_BUCKET: !Ref PhotosBucket
         PHOTOS_TABLE_NAME: !Ref PhotosTable
         SUBSCRIPTIONS_TABLE_NAME: !Ref SubscriptionsTable
         SNS_TOPIC_ARN: !Ref NotificationsTopic
+        ADMIN_EMAILS: !Ref AdminEmails
         YOCO_SECRET_KEY: !Ref YocoSecretKey
 
 Parameters:
@@ -31,6 +34,10 @@ Parameters:
   CognitoDomain:
     Type: String
     Default: babys-calendar
+  AdminEmails:
+    Type: String
+    Default: ""
+    Description: Comma-separated list of admin emails for moderation endpoints
   YocoSecretKey:
     Type: AWS::SSM::Parameter::Value<String>
     Default: /babys-calendar/dev/yoco-secret-key
@@ -183,6 +190,44 @@ Resources:
       KeySchema:
         - AttributeName: userId
           KeyType: HASH
+
+  # Community posts table (shared forum data)
+  CommunityPostsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub babys-calendar-community-posts-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: postId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: postId
+          KeyType: HASH
+
+  # Community comments table (thread per post)
+  CommunityCommentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub babys-calendar-community-comments-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: postId
+          AttributeType: S
+        - AttributeName: commentId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: postId
+          KeyType: HASH
+        - AttributeName: commentId
+          KeyType: RANGE
 
   # ──────────────────────────────────────────────
   # S3 Bucket for photos (encrypted, versioned)
@@ -456,6 +501,154 @@ Resources:
             RestApiId: !Ref ApiGateway
             Path: /subscription/pay
             Method: POST
+
+  # Community posts - shared between all users
+  GetCommunityPostsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.CommunityFunctions::GetPosts
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref CommunityPostsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /community/posts
+            Method: GET
+
+  CreateCommunityPostFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.CommunityFunctions::CreatePost
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CommunityPostsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /community/posts
+            Method: POST
+
+  VoteCommunityPostFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.CommunityFunctions::VotePost
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CommunityPostsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /community/posts/{postId}/vote
+            Method: POST
+
+  ReportCommunityPostFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.CommunityFunctions::ReportPost
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CommunityPostsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /community/posts/{postId}/report
+            Method: POST
+
+  GetCommunityCommentsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.CommunityFunctions::GetComments
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref CommunityCommentsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /community/posts/{postId}/comments
+            Method: GET
+
+  CreateCommunityCommentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.CommunityFunctions::CreateComment
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CommunityCommentsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /community/posts/{postId}/comments
+            Method: POST
+
+  # Admin-only moderation views/actions
+  GetAdminCommunityPostsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.CommunityFunctions::GetAllPostsForAdmin
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref CommunityPostsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /community/admin/posts
+            Method: GET
+
+  UpdateCommunityPostStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.CommunityFunctions::UpdatePostStatus
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CommunityPostsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /community/admin/posts/{postId}/status
+            Method: PUT
+
+  DeleteCommunityPostFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: BabysCalendar.Api::BabysCalendar.Api.Functions.CommunityFunctions::DeletePost
+      CodeUri: ./src/BabysCalendar.Api/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CommunityPostsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CommunityCommentsTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /community/admin/posts/{postId}
+            Method: DELETE
 
   # Scheduled reminder sender (runs daily at 8 AM SAST / 6 AM UTC)
   ReminderSchedulerFunction:
