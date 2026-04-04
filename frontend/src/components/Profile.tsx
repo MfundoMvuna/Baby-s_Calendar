@@ -3,7 +3,7 @@ import { Crown, Users, CalendarSync, Link2, Unlink, Copy, CheckCircle } from "lu
 import type { OnboardingData, ExtendedProfile, PartnerLink, CalendarSyncConfig, SubscriptionStatus } from "@/lib/types";
 import {
   getPartnerLink, createPartnerLink, revokePartnerLink, removePartnerLink,
-  getCalendarSyncConfig, saveCalendarSyncConfig,
+  getCalendarSyncConfig, saveCalendarSyncConfig, refreshPartnerShareToken,
 } from "@/lib/api";
 
 interface ProfileProps {
@@ -297,7 +297,11 @@ const Profile: React.FC<ProfileProps> = ({ data, extendedProfile, onSave, onClos
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
-                          const shareUrl = `${window.location.origin}?partner=${partnerLink.partnerId}`;
+                          // Refresh the token with latest data before sharing
+                          const updated = refreshPartnerShareToken();
+                          const token = updated?.shareToken ?? partnerLink.shareToken ?? "";
+                          if (updated) setPartnerLink(updated);
+                          const shareUrl = `${window.location.origin}?share=${token}`;
                           navigator.clipboard.writeText(shareUrl).then(() => {
                             setLinkCopied(true);
                             setTimeout(() => setLinkCopied(false), 2000);

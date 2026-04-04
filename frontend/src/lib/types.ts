@@ -148,6 +148,39 @@ export interface PartnerLink {
   status: "pending" | "active" | "revoked";
   createdAt: string;
   lastAccessedAt?: string;
+  shareToken?: string;      // base64-encoded snapshot of sender's data
+}
+
+/** Snapshot of pregnancy data embedded in the share token */
+export interface SharedJourney {
+  version: 1;
+  senderName: string;
+  babyNickname?: string;
+  lmpDate: string;
+  eddDate: string;
+  currentWeek: number;
+  events: SharedEvent[];
+  recentSymptoms: string[];
+  photoCount: number;
+  sharedAt: string;          // ISO timestamp
+}
+
+export interface SharedEvent {
+  date: string;
+  title: string;
+  type: string;
+  completed: boolean;
+}
+
+// ── Community Comments ─────────────────────────
+
+export interface CommunityComment {
+  commentId: string;
+  postId: string;
+  userId: string;
+  displayName: string;
+  content: string;
+  createdAt: string;
 }
 
 // ── Google Calendar Sync ───────────────────────

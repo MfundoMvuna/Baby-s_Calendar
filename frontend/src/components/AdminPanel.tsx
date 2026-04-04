@@ -3,15 +3,14 @@
 import React, { useEffect, useState } from "react";
 import {
   Shield, CheckCircle, XCircle, AlertTriangle, Trash2,
-  Eye, ChevronDown, ChevronUp, ArrowLeft, Lock, RefreshCw, KeyRound,
+  Eye, ChevronDown, ChevronUp, ArrowLeft, RefreshCw,
 } from "lucide-react";
 import type { CommunityPost, PostCategory, PostStatus } from "@/lib/types";
 import {
   getAllLocalPosts, updateLocalPostStatus, deleteLocalPost,
-  getAdminPin, setAdminPin, verifyAdminPin, resetAdminPin,
+  remoteApi,
 } from "@/lib/api";
 import { moderateContent, type ModerationResult, type ViolationType } from "@/lib/content-moderation";
-import { useAuth } from "./AuthProvider";
 
 interface AdminPanelProps {
   onClose: () => void;
@@ -49,39 +48,31 @@ const SEVERITY_STYLES: Record<string, string> = {
 type FilterStatus = "all" | PostStatus;
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
-  const { user, handleSignIn } = useAuth();
-  const [authenticated, setAuthenticated] = useState(false);
-  const [pinInput, setPinInput] = useState("");
-  const [pinError, setPinError] = useState("");
-  const [isSetup, setIsSetup] = useState(false);
-  const [confirmPin, setConfirmPin] = useState("");
-  const [showPinReset, setShowPinReset] = useState(false);
-  const [resetPassword, setResetPassword] = useState("");
-  const [resetBusy, setResetBusy] = useState(false);
-  const [resetNewPin, setResetNewPin] = useState("");
-  const [resetStep, setResetStep] = useState<"password" | "newpin">("password");
-
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [moderationCache, setModerationCache] = useState<Map<string, ModerationResult>>(new Map());
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("pending");
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Check if admin PIN exists
+  // Load posts on mount — use remote API when available, fallback to localStorage
   useEffect(() => {
-    const pin = getAdminPin();
-    setIsSetup(!!pin);
+    refreshPosts();
   }, []);
 
-  // Load posts and run moderation
-  useEffect(() => {
-    if (!authenticated) return;
-    refreshPosts();
-  }, [authenticated]);
-
-  function refreshPosts() {
-    const allPosts = getAllLocalPosts();
+  async function refreshPosts() {
+    setLoading(true);
+    let allPosts: CommunityPost[] = [];
+    if (remoteApi.available) {
+      try {
+        allPosts = await remoteApi.getPosts();
+      } catch {
+        allPosts = getAllLocalPosts();
+      }
+    } else {
+      allPosts = getAllLocalPosts();
+    }
     setPosts(allPosts);
     // Run moderation on all posts and cache results
     const cache = new Map<string, ModerationResult>();
@@ -89,42 +80,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       cache.set(p.postId, moderateContent(p.content));
     });
     setModerationCache(cache);
-  }
-
-  // ── Auth flow ──
-  function handlePinSubmit() {
-    if (isSetup) {
-      // Verify existing PIN
-      if (verifyAdminPin(pinInput)) {
-        setAuthenticated(true);
-        setPinError("");
-      } else {
-        setPinError("Incorrect PIN. Try again.");
-      }
-    } else {
-      // Setting up new PIN
-      if (pinInput.length < 4) {
-        setPinError("PIN must be at least 4 digits.");
-        return;
-      }
-      if (!confirmPin) {
-        setConfirmPin(pinInput);
-        setPinInput("");
-        setPinError("");
-        return;
-      }
-      if (pinInput === confirmPin) {
-        setAdminPin(pinInput);
-        setIsSetup(true);
-        setAuthenticated(true);
-        setPinError("");
-      } else {
-        setPinError("PINs don't match. Start over.");
-        setConfirmPin("");
-        setPinInput("");
-      }
-    }
-    setPinInput("");
+    setLoading(false);
   }
 
   // ── Actions ──
@@ -145,9 +101,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   }
 
   /** Auto-moderate all pending posts based on the content engine */
-  function handleBulkAutoModerate() {
+  async function handleBulkAutoModerate() {
     setBulkProcessing(true);
-    const allPosts = getAllLocalPosts();
+    const allPosts = posts;
     let changed = 0;
     allPosts.forEach((p) => {
       if (p.status !== "pending") return;
@@ -161,7 +117,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       }
       // "flag" stays pending for manual review
     });
-    refreshPosts();
+    await refreshPosts();
     setBulkProcessing(false);
   }
 
@@ -182,133 +138,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   };
 
   // ── PIN screen ──
-  if (!authenticated) {
+  // PIN auth has been removed. Admin access is now controlled by the
+  // ADMIN_EMAILS env var + Cognito authentication. If the user sees
+  // this component, they are already verified as an admin.
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50 flex items-center justify-center p-4">
-        <div className="card max-w-sm w-full p-6 space-y-5">
-          <div className="flex items-center gap-3">
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-2">
-              <Shield className="w-6 h-6 text-primary-500" />
-              <h1 className="text-lg font-bold text-primary-700">Admin Panel</h1>
-            </div>
-          </div>
-
-          <div className="text-center space-y-2">
-            <Lock className="w-10 h-10 text-primary-300 mx-auto" />
-            <p className="text-sm text-gray-600">
-              {!isSetup
-                ? confirmPin
-                  ? "Confirm your new admin PIN"
-                  : "Set up your admin PIN (minimum 4 digits)"
-                : "Enter your admin PIN"}
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <input
-              type="password"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={8}
-              value={pinInput}
-              onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ""))}
-              onKeyDown={(e) => e.key === "Enter" && handlePinSubmit()}
-              placeholder="● ● ● ●"
-              className="text-center text-2xl tracking-[0.5em] font-mono"
-              autoFocus
-            />
-            {pinError && <p className="text-xs text-red-500 text-center">{pinError}</p>}
-            <button
-              onClick={handlePinSubmit}
-              disabled={pinInput.length < 4}
-              className="btn-primary w-full disabled:opacity-40"
-            >
-              {!isSetup ? (confirmPin ? "Confirm PIN" : "Set PIN") : "Unlock"}
-            </button>
-            {isSetup && !showPinReset && (
-              <button
-                onClick={() => { setShowPinReset(true); setPinError(""); setResetStep("password"); }}
-                className="text-xs text-primary-400 hover:text-primary-600 mx-auto block"
-              >
-                <KeyRound className="w-3 h-3 inline mr-1" />Forgot PIN?
-              </button>
-            )}
-          </div>
-
-          {/* PIN Reset via Cognito re-auth */}
-          {showPinReset && (
-            <div className="border-t border-gray-100 pt-4 space-y-3">
-              <p className="text-xs text-gray-500 text-center">Verify your account password to reset your admin PIN</p>
-              {resetStep === "password" ? (
-                <>
-                  <input
-                    type="password"
-                    placeholder="Your account password"
-                    value={resetPassword}
-                    onChange={(e) => setResetPassword(e.target.value)}
-                    className="text-sm"
-                  />
-                  <button
-                    onClick={async () => {
-                      if (!resetPassword || !user?.email) return;
-                      setResetBusy(true);
-                      setPinError("");
-                      try {
-                        await handleSignIn(user.email, resetPassword);
-                        setResetStep("newpin");
-                      } catch {
-                        setPinError("Incorrect password. Please try again.");
-                      } finally {
-                        setResetBusy(false);
-                        setResetPassword("");
-                      }
-                    }}
-                    disabled={resetBusy || !resetPassword}
-                    className="btn-primary w-full text-sm disabled:opacity-40"
-                  >
-                    {resetBusy ? "Verifying..." : "Verify Password"}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <input
-                    type="password"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={8}
-                    placeholder="New PIN (min 4 digits)"
-                    value={resetNewPin}
-                    onChange={(e) => setResetNewPin(e.target.value.replace(/\D/g, ""))}
-                    className="text-center text-xl tracking-[0.5em] font-mono"
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => {
-                      if (resetNewPin.length < 4) { setPinError("PIN must be at least 4 digits."); return; }
-                      resetAdminPin(resetNewPin);
-                      setAuthenticated(true);
-                      setShowPinReset(false);
-                      setResetNewPin("");
-                      setPinError("");
-                    }}
-                    disabled={resetNewPin.length < 4}
-                    className="btn-primary w-full text-sm disabled:opacity-40"
-                  >
-                    Set New PIN
-                  </button>
-                </>
-              )}
-              <button
-                onClick={() => { setShowPinReset(false); setPinError(""); setResetPassword(""); setResetNewPin(""); setResetStep("password"); }}
-                className="text-xs text-gray-400 hover:text-gray-600 mx-auto block"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
+        <div className="flex items-center gap-3 animate-pulse">
+          <Shield className="w-6 h-6 text-primary-500" />
+          <span className="text-primary-400 font-medium">Loading posts...</span>
         </div>
       </div>
     );

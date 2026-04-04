@@ -17,8 +17,10 @@ import Insights from "@/components/Insights";
 import Paywall from "@/components/Paywall";
 import AdminPanel from "@/components/AdminPanel";
 import TrimesterCelebration from "@/components/TrimesterCelebration";
+import SharedJourneyView from "@/components/SharedJourneyView";
+import Community from "@/components/Community";
 
-import type { CalendarEvent, ExtendedProfile, OnboardingData, PhotoRecord, PregnancyRecord, SubscriptionStatus, SymptomEntry } from "@/lib/types";
+import type { CalendarEvent, ExtendedProfile, OnboardingData, PhotoRecord, PregnancyRecord, SharedJourney, SubscriptionStatus, SymptomEntry } from "@/lib/types";
 import { DEFAULT_MILESTONES } from "@/lib/clinical-timeline";
 import {
   getPregnancyRecord,
@@ -34,10 +36,11 @@ import {
   saveExtendedProfile,
   getOnboardingData,
   remoteApi,
+  parseShareToken,
 } from "@/lib/api";
 import { calculateEDD, dateForWeek, formatDate, generateId, getCurrentWeek } from "@/lib/utils";
 
-type Tab = "calendar" | "insights" | "photos";
+type Tab = "calendar" | "insights" | "photos" | "community";
 
 /** Admin & premium emails — loaded from env so they stay out of source control */
 const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? "").split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
@@ -65,6 +68,20 @@ export default function HomePage() {
 
   const isAdmin = ADMIN_EMAILS.includes((user?.email ?? "").toLowerCase());
   const isPremiumEmail = PREMIUM_EMAILS.includes((user?.email ?? "").toLowerCase());
+
+  // Shared journey detection — check URL for ?share=TOKEN
+  const [sharedJourney, setSharedJourney] = useState<SharedJourney | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const shareToken = params.get("share") ?? params.get("partner");
+    if (shareToken) {
+      const journey = parseShareToken(shareToken);
+      if (journey) {
+        setSharedJourney(journey);
+      }
+    }
+  }, []);
 
   // New event form state
   const [newTitle, setNewTitle] = useState("");
@@ -279,6 +296,20 @@ export default function HomePage() {
   // Wait for client-side hydration
   if (!mounted) return null;
 
+  // ── Shared Journey View (partner link opened) ──
+  if (sharedJourney) {
+    return (
+      <SharedJourneyView
+        journey={sharedJourney}
+        onClose={() => {
+          setSharedJourney(null);
+          // Clean the URL params
+          window.history.replaceState({}, "", window.location.pathname);
+        }}
+      />
+    );
+  }
+
   // Auth loading
   if (authLoading) {
     return (
@@ -398,6 +429,7 @@ export default function HomePage() {
             { key: "calendar", label: "📅 Calendar" },
             { key: "insights", label: "Insights ✨" },
             { key: "photos", label: "📸 Photos" },
+            { key: "community", label: "💬 Community" },
           ] as { key: Tab; label: string }[]).map((tab) => (
             <button
               key={tab.key}
@@ -621,7 +653,10 @@ export default function HomePage() {
           />
         )}
         {activeTab === "photos" && (
-          <PhotoGallery photos={photos} onUpload={handlePhotoUpload} />
+          
+        {activeTab === "community" && (
+          <Community displayName={onboardingData?.displayName ?? "Anonymous"} />
+        )}<PhotoGallery photos={photos} onUpload={handlePhotoUpload} />
         )}
       </main>
 

@@ -6,6 +6,7 @@
 import type {
   CalendarEvent,
   CalendarSyncConfig,
+  CommunityComment,
   CommunityPost,
   CreatePostInput,
   ExtendedProfile,
@@ -13,6 +14,8 @@ import type {
   PartnerLink,
   PhotoRecord,
   PregnancyRecord,
+  SharedEvent,
+  SharedJourney,
   SubscriptionStatus,
   SymptomEntry,
 } from "./types";
@@ -391,16 +394,96 @@ export function getPartnerLink(): PartnerLink | null {
   return lsGet<PartnerLink | null>(PARTNER_LINK_KEY, null);
 }
 
+/** Build a base64url-encoded share token from the sender's current data */
+export function buildShareToken(): string {
+  const record = getPregnancyRecord();
+  if (!record) throw new Error("No pregnancy record to share");
+
+  const events = getEvents();
+  const symptoms = getSymptomEntries();
+  const photos = getPhotos();
+
+  // Collect recent symptom names (last 7 days)
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const recentSymptoms = [
+    ...new Set(
+      symptoms
+        .filter((s) => s.date >= sevenDaysAgo)
+        .flatMap((s) => s.symptoms),
+    ),
+  ];
+
+  const sharedEvents: SharedEvent[] = events.map((e) => ({
+    date: e.date,
+    title: e.title,
+    type: e.type,
+    completed: e.completed,
+  }));
+
+  const payload: SharedJourney = {
+    version: 1,
+    senderName: record.babyNickname
+      ? `${record.userId === "local-user" ? "Mom" : record.userId}'s journey`
+      : "Pregnancy Journey",
+    babyNickname: record.babyNickname,
+    lmpDate: record.lmpDate,
+    eddDate: record.eddDate,
+    currentWeek: record.currentWeek,
+    events: sharedEvents,
+    recentSymptoms,
+    photoCount: photos.length,
+    sharedAt: new Date().toISOString(),
+  };
+
+  // Store the display name from onboarding if available
+  const onboarding = getOnboardingData();
+  if (onboarding?.displayName) {
+    payload.senderName = onboarding.displayName;
+  }
+
+  const json = JSON.stringify(payload);
+  // base64url encode (URL-safe)
+  const b64 = btoa(json).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return b64;
+}
+
+/** Decode a share token back into SharedJourney data */
+export function parseShareToken(token: string): SharedJourney | null {
+  try {
+    // Restore standard base64 from base64url
+    let b64 = token.replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    const json = atob(b64);
+    const data = JSON.parse(json) as SharedJourney;
+    if (data.version !== 1 || !data.lmpDate || !data.eddDate) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 export function createPartnerLink(email: string, name: string): PartnerLink {
+  const shareToken = buildShareToken();
   const link: PartnerLink = {
     partnerId: generateId(),
     partnerEmail: email,
     partnerName: name,
     status: "pending",
     createdAt: new Date().toISOString(),
+    shareToken,
   };
   lsSet(PARTNER_LINK_KEY, link);
   return link;
+}
+
+/** Refresh the share token with the latest data */
+export function refreshPartnerShareToken(): PartnerLink | null {
+  const link = getPartnerLink();
+  if (!link || link.status === "revoked") return link;
+  const shareToken = buildShareToken();
+  const updated = { ...link, shareToken };
+  lsSet(PARTNER_LINK_KEY, updated);
+  return updated;
 }
 
 export function updatePartnerLink(patch: Partial<PartnerLink>): void {
@@ -418,6 +501,34 @@ export function revokePartnerLink(): void {
 export function removePartnerLink(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(PARTNER_LINK_KEY);
+}
+
+// ─── Community Comments (localStorage) ─────────
+
+const COMMENTS_KEY = "community_comments";
+
+export function getLocalComments(postId: string): CommunityComment[] {
+  const all = lsGet<CommunityComment[]>(COMMENTS_KEY, []);
+  return all.filter((c) => c.postId === postId);
+}
+
+export function getAllLocalComments(): CommunityComment[] {
+  return lsGet<CommunityComment[]>(COMMENTS_KEY, []);
+}
+
+export function saveLocalComment(postId: string, content: string, displayName: string): CommunityComment {
+  const comments = lsGet<CommunityComment[]>(COMMENTS_KEY, []);
+  const comment: CommunityComment = {
+    commentId: generateId(),
+    postId,
+    userId: "local-user",
+    displayName,
+    content,
+    createdAt: new Date().toISOString(),
+  };
+  comments.push(comment);
+  lsSet(COMMENTS_KEY, comments);
+  return comment;
 }
 
 // ─── Google Calendar Sync (localStorage) ───────
