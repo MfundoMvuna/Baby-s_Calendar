@@ -72,6 +72,7 @@ export default function HomePage() {
   // Shared journey detection — check URL for ?share=TOKEN_ID
   const [sharedJourney, setSharedJourney] = useState<SharedJourney | null>(null);
   const [shareLoading, setShareLoading] = useState(false);
+  const [shareError, setShareError] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -81,7 +82,9 @@ export default function HomePage() {
       fetchSharedJourney(shareToken)
         .then((journey) => {
           if (journey) setSharedJourney(journey);
+          else setShareError(true);
         })
+        .catch(() => setShareError(true))
         .finally(() => setShareLoading(false));
     }
   }, []);
@@ -395,6 +398,28 @@ export default function HomePage() {
           window.history.replaceState({}, "", window.location.pathname);
         }}
       />
+    );
+  }
+
+  // ── Invalid / expired share link ──
+  if (shareError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-white to-purple-50 p-6">
+        <div className="max-w-sm text-center space-y-4">
+          <Baby className="w-12 h-12 text-pink-300 mx-auto" />
+          <h1 className="text-lg font-bold text-pink-700">Link Not Found</h1>
+          <p className="text-sm text-gray-500">This share link is invalid, has expired, or has been revoked by the sender.</p>
+          <button
+            onClick={() => {
+              setShareError(false);
+              window.history.replaceState({}, "", window.location.pathname);
+            }}
+            className="inline-block text-sm bg-pink-500 text-white px-5 py-2.5 rounded-full hover:bg-pink-600 transition font-medium"
+          >
+            Go to Baby&apos;s Calendar
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -744,7 +769,7 @@ export default function HomePage() {
           <PhotoGallery photos={photos} onUpload={handlePhotoUpload} />
         )}
         {activeTab === "community" && (
-          <Community displayName={onboardingData?.displayName ?? "Anonymous"} />
+          <Community displayName={onboardingData?.displayName ?? "Anonymous"} isPremium={subscription?.limits.isPremium || isPremiumEmail} />
         )}
       </main>
 

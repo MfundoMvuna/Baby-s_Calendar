@@ -24,6 +24,7 @@ import { useAuth } from "./AuthProvider";
 
 interface CommunityProps {
   displayName: string;
+  isPremium?: boolean;
 }
 
 const CATEGORY_OPTIONS: { value: PostCategory; label: string; emoji: string }[] = [
@@ -43,7 +44,7 @@ const CATEGORY_LABELS: Record<PostCategory, string> = {
 /** Pub/Sub polling interval (seconds) */
 const POLL_INTERVAL = 15;
 
-const Community: React.FC<CommunityProps> = ({ displayName }) => {
+const Community: React.FC<CommunityProps> = ({ displayName, isPremium = false }) => {
   const { user } = useAuth();
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [comments, setComments] = useState<Map<string, CommunityComment[]>>(new Map());
@@ -68,9 +69,11 @@ const Community: React.FC<CommunityProps> = ({ displayName }) => {
 
   const fetchPosts = useCallback(async () => {
     let fetched: CommunityPost[] = [];
+    let usedRemote = false;
     if (remoteApi.available) {
       try {
         fetched = await remoteApi.getPosts();
+        usedRemote = true;
       } catch {
         fetched = getLocalPosts();
       }
@@ -78,8 +81,8 @@ const Community: React.FC<CommunityProps> = ({ displayName }) => {
       fetched = getLocalPosts();
     }
     // Backend already returns only approved posts for non-admin callers.
-    // For local fallback, filter to approved only.
-    if (!remoteApi.available) {
+    // For local fallback (including when remote fails), filter to approved only.
+    if (!usedRemote) {
       fetched = fetched.filter((p) => p.status === "approved");
     }
     fetched.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -266,7 +269,7 @@ const Community: React.FC<CommunityProps> = ({ displayName }) => {
           />
           <div className="flex items-center justify-between">
             <p className="text-[10px] text-gray-400">
-              Posts are reviewed before they appear to the community.
+              Your post will appear in the community feed once submitted.
             </p>
             <button
               onClick={handleCreatePost}
@@ -359,16 +362,20 @@ const Community: React.FC<CommunityProps> = ({ displayName }) => {
                   {/* Action bar */}
                   <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-50">
                     <button
-                      onClick={() => handleVote(post.postId, "up")}
+                      onClick={() => isPremium && handleVote(post.postId, "up")}
+                      title={isPremium ? "Upvote" : "Premium feature"}
                       className={`flex items-center gap-1 text-xs transition-colors ${
+                        !isPremium ? "text-gray-300 cursor-not-allowed" :
                         currentVote === "up" ? "text-primary-600 font-medium" : "text-gray-400 hover:text-primary-500"
                       }`}
                     >
                       <ThumbsUp className="w-3.5 h-3.5" /> {post.upvotes}
                     </button>
                     <button
-                      onClick={() => handleVote(post.postId, "down")}
+                      onClick={() => isPremium && handleVote(post.postId, "down")}
+                      title={isPremium ? "Downvote" : "Premium feature"}
                       className={`flex items-center gap-1 text-xs transition-colors ${
+                        !isPremium ? "text-gray-300 cursor-not-allowed" :
                         currentVote === "down" ? "text-red-500 font-medium" : "text-gray-400 hover:text-gray-500"
                       }`}
                     >
@@ -383,8 +390,11 @@ const Community: React.FC<CommunityProps> = ({ displayName }) => {
                       {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     </button>
                     <button
-                      onClick={() => handleReport(post.postId)}
-                      className="flex items-center gap-1 text-xs text-gray-300 hover:text-red-400 transition-colors ml-auto"
+                      onClick={() => isPremium && handleReport(post.postId)}
+                      title={isPremium ? "Report" : "Premium feature"}
+                      className={`flex items-center gap-1 text-xs transition-colors ml-auto ${
+                        !isPremium ? "text-gray-200 cursor-not-allowed" : "text-gray-300 hover:text-red-400"
+                      }`}
                     >
                       <Flag className="w-3 h-3" />
                     </button>
